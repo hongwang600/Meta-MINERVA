@@ -14,14 +14,15 @@ class RelationEntityBatcher():
     '''
     creates an indexed graph, store the answer entities for each query
     '''
-    def __init__(self, input_dir, batch_size, entity_vocab, relation_vocab, mode = "train"):
+    def __init__(self, input_dir, batch_size, entity_vocab, relation_vocab,
+                 mode="train", batcher_triples=[]):
         self.input_dir = input_dir
         self.input_file = input_dir+'/{0}.txt'.format(mode)
         self.batch_size = batch_size
         self.entity_vocab = entity_vocab
         self.relation_vocab = relation_vocab
         self.mode = mode
-        self.create_triple_store(self.input_file)
+        self.create_triple_store(self.input_file, batcher_triples)
         # print("batcher loaded")
 
 
@@ -32,13 +33,14 @@ class RelationEntityBatcher():
             yield self.yield_next_batch_test()
 
 
-    def create_triple_store(self, input_file):
+    def create_triple_store(self, input_file, batcher_triples):
         self.store_all_correct = defaultdict(set)
         self.store = []
         if self.mode == 'train':
-            with open(input_file) as raw_input_file:
-                csv_file = csv.reader(raw_input_file, delimiter = '\t' )
-                for line in csv_file:
+            #with open(input_file) as raw_input_file:
+            #    csv_file = csv.reader(raw_input_file, delimiter = '\t' )
+            #    for line in csv_file:
+            for line in batcher_triples:
                     e1 = self.entity_vocab[line[0]]
                     r = self.relation_vocab[line[1]]
                     e2 = self.entity_vocab[line[2]]
@@ -47,8 +49,9 @@ class RelationEntityBatcher():
             self.store = np.array(self.store)
         else:
             with open(input_file) as raw_input_file:
-                csv_file = csv.reader(raw_input_file, delimiter = '\t' )
-                for line in csv_file:
+                #csv_file = csv.reader(raw_input_file, delimiter = '\t' )
+                #for line in csv_file:
+                for line in batcher_triples:
                     e1 = line[0]
                     r = line[1]
                     e2 = line[2]
@@ -211,7 +214,7 @@ class RelationEntityGrapher:
 
                 correct_e2 = answers[i]
                 for j in range(entities.shape[0]):
-                    if entities[j] in all_correct_answers[i/rollouts] and entities[j] != correct_e2:
+                    if entities[j] in all_correct_answers[int(i/rollouts)] and entities[j] != correct_e2:
                         entities[j] = self.ePAD
                         relations[j] = self.rPAD
 
@@ -293,7 +296,7 @@ class Episode(object):
 
 
 class env(object):
-    def __init__(self, params, mode='train'):
+    def __init__(self, params, mode='train', batcher_triples=[]):
 
         self.batch_size = params['batch_size']
         self.num_rollouts = params['num_rollouts']
@@ -307,14 +310,17 @@ class env(object):
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  batch_size=params['batch_size'],
                                                  entity_vocab=params['entity_vocab'],
-                                                 relation_vocab=params['relation_vocab']
+                                                 relation_vocab=params['relation_vocab'],
+                                                 batcher_triples=batcher_triples
                                                  )
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
                                                  batch_size=params['batch_size'],
                                                  entity_vocab=params['entity_vocab'],
-                                                 relation_vocab=params['relation_vocab'])
+                                                 relation_vocab=params['relation_vocab'],
+                                                 batcher_triples=batcher_triples
+                                                 )
 
             self.total_no_examples = self.batcher.store.shape[0]
         self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'graph.txt',

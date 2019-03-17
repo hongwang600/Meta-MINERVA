@@ -12,14 +12,17 @@ from tqdm import tqdm
 import os
 from collections import defaultdict
 import shutil
+import random
 
 from tensorboardX import SummaryWriter
 
 from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
+from data import construct_data, concat_data
  
 # read parameters
+random.seed(1)
 args = read_options()
 # logging
 logger = logging.getLogger(args['id'])
@@ -30,14 +33,21 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 logfile = logging.FileHandler(args['log_path'], 'w')
 logfile.setFormatter(formatter)
-logger.addHandler(logfile) 
+logger.addHandler(logfile)
 
 def train(args):
+    data = construct_data(args)
+    meta_train_data, meta_dev_data, meta_test_data, few_shot_data = data
+    concated_train_data = concat_data(meta_train_data)
+    concated_dev_data = concat_data(meta_dev_data)
+    random.shuffle(concated_train_data)
+    random.shuffle(concated_dev_data)
+    #print(concated_dev_data)
     logger.info('start training')
 
     # build the train and validation environment here
-    train_env = env(args, mode='train')
-    dev_env = env(args, mode='dev')
+    train_env = env(args, mode='train', batcher_triples=concated_train_data)
+    dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
 
     if os.path.exists('logs/' + args['id']):
         shutil.rmtree('logs/' + args['id'], ignore_errors=True)
@@ -59,14 +69,14 @@ def train(args):
 
         record_action_probs = []
         record_probs = []
-        for step in xrange(args['path_length']):
+        for step in range(args['path_length']):
             next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
             next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
             curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda()
 
             probs, states = agent(next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents)
             record_probs.append(probs)
-            action = torch.multinomial(probs).detach()
+            action = torch.multinomial(probs, 1).detach()
             action_flat = action.data.squeeze()
             action_gather_indice = torch.arange(0, batch_size).long().cuda() * args['max_num_actions'] + action_flat
             action_prob = probs.view(-1)[action_gather_indice]

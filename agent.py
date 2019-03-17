@@ -8,7 +8,7 @@ from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
 
-from yellowfin import YFOptimizer
+#from yellowfin import YFOptimizer
 
 class Agent(nn.Module):
     """The agent class, it includes model definition and forward functions"""
@@ -141,7 +141,7 @@ class Agent(nn.Module):
         #     self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
             # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
-        return self.loss.data[0], np.mean(rewards)
+        return self.loss.item(), np.mean(rewards)
 
     def save(self, path):
         torch.save(self.state_dict(), path)
