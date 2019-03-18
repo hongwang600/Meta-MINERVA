@@ -6,11 +6,11 @@ def read_json_data(file_name):
 
 def construct_data(args):
     input_dir = args['data_input_dir']
-    meta_train_data = read_json_data(input_dir+'/'+args['meta_train_file'])
+    train_data = read_json_data(input_dir+'/'+args['train_file'])
+    dev_data = read_json_data(input_dir+'/'+args['dev_file'])
     meta_dev_data = read_json_data(input_dir+'/'+args['meta_dev_file'])
-    meta_test_data = read_json_data(input_dir+'/'+args['meta_test_file'])
-    few_shot_data = read_json_data(input_dir+'/'+args['few_shot_file'])
-    return [meta_train_data, meta_dev_data, meta_test_data, few_shot_data]
+    few_shot_dev_data = read_json_data(input_dir+'/'+args['few_shot_dev_file'])
+    return [train_data, dev_data, meta_dev_data, few_shot_dev_data]
 
 def concat_data(data):
     ret_data = []

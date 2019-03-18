@@ -48,18 +48,18 @@ class RelationEntityBatcher():
                     self.store_all_correct[(e1, r)].add(e2)
             self.store = np.array(self.store)
         else:
-            with open(input_file) as raw_input_file:
+            #with open(input_file) as raw_input_file:
                 #csv_file = csv.reader(raw_input_file, delimiter = '\t' )
                 #for line in csv_file:
-                for line in batcher_triples:
-                    e1 = line[0]
-                    r = line[1]
-                    e2 = line[2]
-                    if e1 in self.entity_vocab and e2 in self.entity_vocab:
-                        e1 = self.entity_vocab[e1]
-                        r = self.relation_vocab[r]
-                        e2 = self.entity_vocab[e2]
-                        self.store.append([e1,r,e2])
+            for line in batcher_triples:
+                e1 = line[0]
+                r = line[1]
+                e2 = line[2]
+                if e1 in self.entity_vocab and e2 in self.entity_vocab:
+                    e1 = self.entity_vocab[e1]
+                    r = self.relation_vocab[r]
+                    e2 = self.entity_vocab[e2]
+                    self.store.append([e1,r,e2])
             self.store = np.array(self.store)
             fact_files = ['train.txt', 'test.txt', 'dev.txt', 'graph.txt']
             if os.path.isfile(self.input_dir+'/'+'full_graph.txt'):
