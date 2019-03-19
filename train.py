@@ -20,7 +20,7 @@ from tensorboardX import SummaryWriter
 from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
-from data import construct_data, concat_data
+from data import construct_data, concat_data, get_id_relation, build_vocab
  
 # read parameters
 random.seed(1)
@@ -70,6 +70,9 @@ def train_one_episode(agent, episode):
 
 def train(args):
     data = construct_data(args)
+    id_rels = get_id_relation(args)
+    my_vocab = build_vocab(args)
+    #print(len(id_rels))
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
     concated_train_data = concat_data(train_data)
     concated_dev_data = concat_data(dev_data)

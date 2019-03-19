@@ -7,8 +7,54 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
 import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
+from data import get_id_relation, tokenize_relation, build_vocab
 
 #from yellowfin import YFOptimizer
+class Packed(nn.Module):
+    '''
+    usage:
+    initialize your LSTM as lstm = Packed(nn.LSTM(...))
+    '''
+
+    def __init__(self, rnn):
+        super().__init__()
+        self.rnn = rnn
+
+    @property
+    def batch_first(self):
+        return self.rnn.batch_first
+
+    def forward(self, inputs, lengths, hidden=None, max_length=None):
+        lengths = torch.tensor(lengths)
+        lens, indices = torch.sort(lengths, 0, True)
+        inputs = inputs[indices] if self.batch_first else inputs[:, indices]
+        outputs, (h, c) = self.rnn(nn.utils.rnn.pack_padded_sequence(inputs, lens.tolist(), batch_first=self.batch_first), hidden)
+        outputs, _ = nn.utils.rnn.pad_packed_sequence(outputs, batch_first=self.batch_first, total_length=max_length)
+        _, _indices = torch.sort(indices, 0)
+        outputs = outputs[_indices] if self.batch_first else outputs[:, _indices]
+        h, c = h[:, _indices, :], c[:, _indices, :]
+        return outputs, (h, c)
+
+class LSTM(nn.Module):
+    def __init__(self, arg, vocab_embedding):
+        super(LSTM, self).__init__()
+        self.hidden_dim = arg['hidden_size']
+        vocab_size, embedding_dim = vocab_embedding.shape
+
+        # The LSTM takes word embeddings as inputs, and outputs hidden states
+        # with dimensionality hidden_dim.
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding.weight.data.copy_(torch.from_numpy(vocab_embedding))
+        self.lstm = Packed(nn.LSTM(embedding_dim, self.hidden_dim,
+                                   bidirectional=False))
+
+    def forward(self, padded_sentences, lengths):
+        padded_embeds = self.embedding(padded_sentences)
+        #print(len(padded_sentences))
+        lstm_out, hidden_state = self.lstm(padded_embeds, lengths)
+        permuted_hidden = hidden_state[0].permute([1,0,2]).contiguous()
+        return permuted_hidden.view(permuted_hidden.size(0), -1)
 
 class Agent(nn.Module):
     """The agent class, it includes model definition and forward functions"""
@@ -33,8 +79,15 @@ class Agent(nn.Module):
         self.rPAD = self.relation_vocab['PAD']
 
         # relation embedding matrix
-        self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
+        #self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
         # nn.init.xavier_uniform(self.relation_emb.weight)
+
+        self.id_rels = get_id_relation(arg)
+        self.token_vocab = build_vocab(arg)
+        token_embed = self.token_vocab.embedding.idx_to_vec
+        self.relation_enc = LSTM(arg, token_embed.asnumpy())
+        self.all_relation_tokens, self.all_relation_token_lengths =\
+            self.all_tokenized_relations()
 
         # entity embedding matrix
         self.entity_emb = nn.Embedding(self.num_entity, self.embed_size)
@@ -93,6 +146,27 @@ class Agent(nn.Module):
         logits = F.softmax(logits)
 
         return logits, next_states
+
+    def all_tokenized_relations(self):
+        relation_ids = list(self.id_rels.keys())
+        relation_names = [self.id_rels[this_id] for this_id in relation_ids]
+        token_ids = [torch.tensor(self.token_vocab(tokenize_relation(rel)))
+                     for rel in relation_names]
+        token_lengths = torch.tensor([len(_) for _ in token_ids])
+        token_ids = pad_sequence(token_ids)
+        #token_ids = self.token_vocab[tokenize_names]
+        return token_ids.cuda(), token_lengths.cuda()
+
+    def relation_emb(self, relation_ids):
+        #print(relation_ids.size())
+        #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
+        all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
+                                                    self.all_relation_token_lengths)
+        set_size = list(relation_ids.size())
+        set_size.append(-1)
+        ret_rel_emb = all_relation_embeddings[relation_ids.view(-1)]
+        #print(all_relation_embeddings.size(), set_size)
+        return ret_rel_emb.view(set_size)
 
     def init_rnn_states(self, batch_size):
         init = []

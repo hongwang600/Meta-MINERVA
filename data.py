@@ -1,4 +1,5 @@
 import json
+import gluonnlp
 
 def read_json_data(file_name):
     with open(file_name) as f_in:
@@ -20,3 +21,29 @@ def concat_data(data):
     for k in data:
         ret_data += data[k]
     return ret_data
+
+def get_id_relation(args):
+    id_rels = {}
+    # id_ents = {}
+    for key, value in args['relation_vocab'].items():
+        id_rels[value] = key
+    return id_rels
+
+def tokenize_relation(rel):
+    tokens = []
+    relations = rel.split('.')
+    for this_relation in relations:
+        tokens += this_relation.split('/')[-3:]
+        tokens.append('[SEP]')
+    return tokens[:-1]
+
+def build_vocab(args):
+    tokens = []
+    #print(len(args['relation_vocab']))
+    for key, value in args['relation_vocab'].items():
+        tokens += tokenize_relation(key)
+    counter = gluonnlp.data.count_tokens(tokens)
+    my_vocab = gluonnlp.Vocab(counter)
+    glove = gluonnlp.embedding.create('glove', source='glove.6B.100d')
+    my_vocab.set_embedding(glove)
+    return my_vocab
