@@ -77,7 +77,7 @@ def train(args):
     #print(len(id_rels))
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
     #concated_train_data = concat_data(train_data)
-    #concated_dev_data = concat_data(dev_data)
+    concated_dev_data = concat_data(dev_data)
     #random.shuffle(concated_train_data)
     #random.shuffle(concated_dev_data)
     #print(concated_dev_data)
@@ -85,7 +85,7 @@ def train(args):
 
     # build the train and validation environment here
     #train_env = env(args, mode='train', batcher_triples=concated_train_data)
-    #dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
+    dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
 
     #print(len(train_data.values()))
     train_env = env(args, mode='train', batcher_triples=train_data.values())
@@ -107,13 +107,13 @@ def train(args):
 
     for episode in train_env.get_episodes():
         #print('get episode')
-        meta_step(agent, episode, args)
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        batch_loss = meta_step(agent, episode, args)
+        #batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         writer.add_scalar('batch_loss', batch_loss, agent.update_steps)
-        writer.add_scalar('avg_reward', avg_reward, agent.update_steps)
+        #writer.add_scalar('avg_reward', avg_reward, agent.update_steps)
 
         logger.info('batch_loss at iter %d: %f' % (agent.update_steps, batch_loss))
-        logger.info('success_rate at iter %d: %f' % (agent.update_steps, success_rate))
+        #logger.info('success_rate at iter %d: %f' % (agent.update_steps, success_rate))
 
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)

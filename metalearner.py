@@ -5,6 +5,7 @@ from torch.nn.utils.convert_parameters import (vector_to_parameters,
 from torch.distributions.kl import kl_divergence
 from collections import OrderedDict
 from agent import Agent
+import numpy as np
 
 #from maml_rl.utils.torch_utils import (weighted_mean, detach_distribution,
 #                                       weighted_normalize)
@@ -18,11 +19,25 @@ def compute_new_params(agent, episodes, args):
                                                args['alpha1']))
     return task_params
 
-def compute_loss(agent, episodes, args):
-    losses = []
-    for task_episode in epidoses:
-        losses.append(task_loss(agent, task_episode, args))
-    return torch.mean(torch.stack(losses, dim=0))
+def compute_grads(agent, episodes, args):
+    task_grads = []
+    task_losses = []
+    for task_episode in episodes:
+        new_params = agent.update_params(task_loss(agent, task_episode, args),
+                                         args['alpha1'])
+        new_agent = Agent(args)
+        new_agent.cuda()
+        new_agent.load_state_dict(new_params)
+        new_loss = task_loss(new_agent, task_episode, args)
+        task_grads.append(torch.autograd.grad(new_loss, new_agent.parameters()))
+        task_losses.append(new_loss.item())
+        #del new_agent
+        #print(task_grads[-1])
+        del new_loss
+        del new_agent
+        del new_params
+        #print(task_grads[-1])
+    return task_grads, task_losses
 
 def task_loss(agent, episode, args):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
@@ -61,9 +76,11 @@ def meta_step(agent, episodes, args):
     """Meta-optimization step (ie. update of the initial parameters), based 
     on Trust Region Policy Optimization (TRPO, [4]).
     """
-    task_params = compute_new_params(agent, episodes, args)
+    #task_params = compute_new_params(agent, episodes, args)
     #grads = torch.autograd.grad(loss, agent.parameters)
     #grads = parameters_to_vector(grads)
+    task_grads, task_losses = compute_grads(agent, episodes, args)
+    '''
     losses = []
     for i, this_task_param in enumerate(task_params):
         new_agent = Agent(args)
@@ -72,6 +89,10 @@ def meta_step(agent, episodes, args):
         losses.append(task_loss(new_agent, episodes[i], args))
     mean_loss = torch.mean(torch.stack(losses, dim=0))
     grads = torch.autograd.grad(mean_loss, agent.parameters(), allow_unused=True)
-    for (name, param), grad in zip(agent.named_parameters(), grads):
-        print(grad)
-        param = param - args['alpha2'] * grad
+    '''
+    for grads in task_grads:
+        for (name, param), grad in zip(agent.named_parameters(), grads):
+            #print(grad)
+            param = param - args['alpha2'] * grad / len(task_grads)
+    agent.update_steps += 1
+    return np.mean(task_losses)
