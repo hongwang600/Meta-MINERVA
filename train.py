@@ -14,6 +14,7 @@ from collections import defaultdict
 import shutil
 import random
 import copy
+from collections import OrderedDict
 
 from tensorboardX import SummaryWriter
 
@@ -21,6 +22,7 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
+#from metalearner import MetaLearner
  
 # read parameters
 random.seed(1)
@@ -61,7 +63,7 @@ def train_one_episode(agent, episode):
 
         pre_states = states
         pre_rels = chosen_relations
-        state = episode(action_flat.cpu().numpy())
+    state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_reward()
     batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs)
@@ -74,16 +76,20 @@ def train(args):
     my_vocab = build_vocab(args)
     #print(len(id_rels))
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
-    concated_train_data = concat_data(train_data)
-    concated_dev_data = concat_data(dev_data)
-    random.shuffle(concated_train_data)
-    random.shuffle(concated_dev_data)
+    #concated_train_data = concat_data(train_data)
+    #concated_dev_data = concat_data(dev_data)
+    #random.shuffle(concated_train_data)
+    #random.shuffle(concated_dev_data)
     #print(concated_dev_data)
     logger.info('start training')
 
     # build the train and validation environment here
-    train_env = env(args, mode='train', batcher_triples=concated_train_data)
-    dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
+    #train_env = env(args, mode='train', batcher_triples=concated_train_data)
+    #dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
+
+    #print(len(train_data.values()))
+    train_env = env(args, mode='train', batcher_triples=train_data.values())
+    #print('load all envs')
 
     if os.path.exists('logs/' + args['id']):
         shutil.rmtree('logs/' + args['id'], ignore_errors=True)
@@ -95,8 +101,12 @@ def train(args):
     # build the agent here
     agent = Agent(args)
     agent.cuda()
+    print(OrderedDict(agent.named_parameters()))
+
+    #meta_learner = MetaLearner(train_env, agent)
 
     for episode in train_env.get_episodes():
+        print('get episode')
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         writer.add_scalar('batch_loss', batch_loss, agent.update_steps)
         writer.add_scalar('avg_reward', avg_reward, agent.update_steps)

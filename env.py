@@ -8,6 +8,7 @@ from collections import defaultdict
 import csv
 import random
 import os
+random.seed(1)
 
 
 class RelationEntityBatcher():
@@ -305,14 +306,17 @@ class env(object):
         self.mode = mode
         self.path_len = params['path_length']
         self.test_rollouts = params['test_rollouts']
+        self.num_meta_tasks = params['num_meta_tasks']
         input_dir = params['data_input_dir']
         if mode == 'train':
-            self.batcher = RelationEntityBatcher(input_dir=input_dir,
-                                                 batch_size=params['batch_size'],
-                                                 entity_vocab=params['entity_vocab'],
-                                                 relation_vocab=params['relation_vocab'],
-                                                 batcher_triples=batcher_triples
-                                                 )
+            self.batcher = []
+            for _ in batcher_triples:
+                self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                                          batch_size=params['batch_size'],
+                                                          entity_vocab=params['entity_vocab'],
+                                                          relation_vocab=params['relation_vocab'],
+                                                          batcher_triples=_
+                                                          ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
@@ -328,15 +332,20 @@ class env(object):
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])
 
-    def get_episodes(self):
+    def get_episodes(self, args):
         params = self.batch_size, self.path_len, self.num_rollouts, self.test_rollouts, self.positive_reward, self.negative_reward, self.mode, self.batcher
         if self.mode == 'train':
             # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
-            for data in self.batcher.yield_next_batch_train():
-
-                # print data[0].shape # (512,)
-
-                yield Episode(self.grapher, data, params)
+            batch_generaters = [task_batcher.yield_next_batch_train()
+                                for task_batcher in self.batcher]
+            while True:
+                ret_episodes = []
+                random.shuffle(batch_generaters)
+                for task_batcher in batch_generaters[:self.num_meta_tasks]:
+                    data = next(task_batcher)
+                    # print data[0].shape # (512,)
+                    ret_episodes.append(Episode(self.grapher, data, params))
+                yield ret_episodes
         else:
             for data in self.batcher.yield_next_batch_test():
                 if data == None:

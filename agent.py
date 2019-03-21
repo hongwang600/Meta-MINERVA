@@ -111,7 +111,7 @@ class Agent(nn.Module):
 
         self.baseline = 0.0
 
-    def forward(self, next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents):
+    def forward(self, next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents, params=None):
         """
         batch_size here equals to ortiginal batch_size * num_rollouts
         next_rels, next_ents ---- batch * action_num
@@ -119,14 +119,16 @@ class Agent(nn.Module):
         query_rels --- 
         
         """
+        if params is None:
+            params = OrderedDict(self.named_parameters())
 
-        next_rel_emb = self.relation_emb(next_rels)
+        next_rel_emb = self.relation_emb(next_rels, params)
         next_ent_emb = self.entity_emb(next_ents)
         action_emb = torch.cat((next_rel_emb, next_ent_emb), dim=2) # batch_size * action_num * 2d
 
-        query_rel_emb = self.relation_emb(query_rels)
+        query_rel_emb = self.relation_emb(query_rels, params)
         curr_ent_emb = self.entity_emb(curr_ents)
-        pre_rel_emb = self.relation_emb(pre_rels)
+        pre_rel_emb = self.relation_emb(pre_rels, params)
 
         # update RNN states
         inputs = torch.cat((pre_rel_emb, curr_ent_emb), dim=1)
@@ -223,12 +225,59 @@ class Agent(nn.Module):
     def load(self, path):
         self.load_state_dict(torch.load(path))
 
+    def get_grads(self, rewards, record_action_probs, record_probs):
+        # discounted rewards
+
+        discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
+        discounted_rewards[:,-1] = rewards
+        for i in range(1, self.path_length):
+            discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
+        final_reward = discounted_rewards - self.baseline
+        reward_mean = np.mean(final_reward)
+        reward_var = np.var(final_reward)
+        reward_std = np.sqrt(reward_var) + 1e-6
+        final_reward = (final_reward - reward_mean) / reward_std
+
+        # beta = self.beta * 0.9 ** (self.update_steps // 400)
+        beta = self.beta
+        # beta = 0.0
+        self.update_steps += 1
+
+        # entropy loss
+        record_probs = torch.stack(record_probs, dim=2)
+        p_logp = torch.log(record_probs + 1e-8) * record_probs
+        self.entropy_loss = beta * torch.mean(torch.sum(p_logp, dim=1))
+
+        # RL loss
+        record_action_probs = torch.stack(record_action_probs, dim=1)
+        self.rl_loss = - torch.mean(torch.log(record_action_probs + 1e-8) * Variable(torch.FloatTensor(final_reward)).cuda())
 
 
+        self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
+        self.loss = self.entropy_loss + self.rl_loss
+        return self.loss
+        return torch.autograd.grad(self.loss, self.parameters)
+        #self.optim.zero_grad()
+        #self.loss.backward()
+        #nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
+        #self.optim.step()
 
+        # # decrease the learning rate here
+        # if self.update_steps % 500 == 0 and self.update_steps > 0:
+        #     self.learning_rate = 0.9 * self.learning_rate
+        #     self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+            # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
+        #return self.loss.item(), np.mean(rewards)
+    def update_params(self, loss, step_size=0.5, first_order=False):
+        """Apply one step of gradient descent on the loss function `loss`, with 
+        step-size `step_size`, and returns the updated parameters of the neural 
+        network.
+        """
+        grads = torch.autograd.grad(loss, self.parameters(),
+            create_graph=not first_order)
+        updated_params = OrderedDict()
+        for (name, param), grad in zip(self.named_parameters(), grads):
+            updated_params[name] = param - step_size * grad
 
-
-
-
-
+        return updated_params
