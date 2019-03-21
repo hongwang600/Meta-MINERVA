@@ -22,7 +22,7 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
-#from metalearner import MetaLearner
+from metalearner import meta_step
  
 # read parameters
 random.seed(1)
@@ -101,12 +101,13 @@ def train(args):
     # build the agent here
     agent = Agent(args)
     agent.cuda()
-    print(OrderedDict(agent.named_parameters()))
+    #print(OrderedDict(agent.named_parameters()))
 
     #meta_learner = MetaLearner(train_env, agent)
 
     for episode in train_env.get_episodes():
-        print('get episode')
+        #print('get episode')
+        meta_step(agent, episode, args)
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         writer.add_scalar('batch_loss', batch_loss, agent.update_steps)
         writer.add_scalar('avg_reward', avg_reward, agent.update_steps)

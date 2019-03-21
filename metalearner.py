@@ -1,7 +1,10 @@
 import torch
+from torch.autograd import Variable
 from torch.nn.utils.convert_parameters import (vector_to_parameters,
                                                parameters_to_vector)
 from torch.distributions.kl import kl_divergence
+from collections import OrderedDict
+from agent import Agent
 
 #from maml_rl.utils.torch_utils import (weighted_mean, detach_distribution,
 #                                       weighted_normalize)
@@ -10,18 +13,18 @@ from torch.distributions.kl import kl_divergence
 
 def compute_new_params(agent, episodes, args):
     task_params = []
-    for task_episode in epidoses:
-        task_params.append(agent.update_params(task_loss(agent, task_episode),
+    for task_episode in episodes:
+        task_params.append(agent.update_params(task_loss(agent, task_episode, args),
                                                args['alpha1']))
     return task_params
 
-def compute_loss(agent, episodes):
+def compute_loss(agent, episodes, args):
     losses = []
     for task_episode in epidoses:
-        losses.append(task_loss(agent, task_episode))
+        losses.append(task_loss(agent, task_episode, args))
     return torch.mean(torch.stack(losses, dim=0))
 
-def task_loss(agent, episode):
+def task_loss(agent, episode, args):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -49,43 +52,26 @@ def task_loss(agent, episode):
     state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_reward()
-    grads = agent.get_grads(rewards, record_action_probs, record_probs)
+    loss = agent.get_loss(rewards, record_action_probs, record_probs)
     #success_rate = np.sum(rewards) / batch_size
     #return batch_loss, avg_reward, success_rate
-    return grads
+    return loss
 
-def step(agent, episodes, args):
+def meta_step(agent, episodes, args):
     """Meta-optimization step (ie. update of the initial parameters), based 
     on Trust Region Policy Optimization (TRPO, [4]).
     """
     task_params = compute_new_params(agent, episodes, args)
-    grads = torch.autograd.grad(loss, agent.parameters)
-    grads = parameters_to_vector(grads)
-
-    # Compute the step direction with Conjugate Gradient
-    hessian_vector_product = self.hessian_vector_product(episodes,
-        damping=cg_damping)
-    stepdir = conjugate_gradient(hessian_vector_product, grads,
-        cg_iters=cg_iters)
-
-    # Compute the Lagrange multiplier
-    shs = 0.5 * torch.dot(stepdir, hessian_vector_product(stepdir))
-    lagrange_multiplier = torch.sqrt(shs / max_kl)
-
-    step = stepdir / lagrange_multiplier
-
-    # Save the old parameters
-    old_params = parameters_to_vector(self.policy.parameters())
-
-    # Line search
-    step_size = 1.0
-    for _ in range(ls_max_steps):
-        vector_to_parameters(old_params - step_size * step,
-                             self.policy.parameters())
-        loss, kl, _ = self.surrogate_loss(episodes, old_pis=old_pis)
-        improve = loss - old_loss
-        if (improve.item() < 0.0) and (kl.item() < max_kl):
-            break
-        step_size *= ls_backtrack_ratio
-    else:
-        vector_to_parameters(old_params, self.policy.parameters())
+    #grads = torch.autograd.grad(loss, agent.parameters)
+    #grads = parameters_to_vector(grads)
+    losses = []
+    for i, this_task_param in enumerate(task_params):
+        new_agent = Agent(args)
+        new_agent.cuda()
+        new_agent.load_state_dict(this_task_param)
+        losses.append(task_loss(new_agent, episodes[i], args))
+    mean_loss = torch.mean(torch.stack(losses, dim=0))
+    grads = torch.autograd.grad(mean_loss, agent.parameters(), allow_unused=True)
+    for (name, param), grad in zip(agent.named_parameters(), grads):
+        print(grad)
+        param = param - args['alpha2'] * grad

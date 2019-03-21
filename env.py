@@ -332,7 +332,7 @@ class env(object):
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])
 
-    def get_episodes(self, args):
+    def get_episodes(self):
         params = self.batch_size, self.path_len, self.num_rollouts, self.test_rollouts, self.positive_reward, self.negative_reward, self.mode, self.batcher
         if self.mode == 'train':
             # yield_next_batch_train will return batched e1, r, e1 and all correct e2s

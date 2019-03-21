@@ -9,6 +9,7 @@ from torch import optim
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from data import get_id_relation, tokenize_relation, build_vocab
+from collections import OrderedDict
 
 #from yellowfin import YFOptimizer
 class Packed(nn.Module):
@@ -119,8 +120,8 @@ class Agent(nn.Module):
         query_rels --- 
         
         """
-        if params is None:
-            params = OrderedDict(self.named_parameters())
+        #if params is None:
+        #    params = OrderedDict(self.named_parameters())
 
         next_rel_emb = self.relation_emb(next_rels, params)
         next_ent_emb = self.entity_emb(next_ents)
@@ -159,7 +160,7 @@ class Agent(nn.Module):
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(), token_lengths.cuda()
 
-    def relation_emb(self, relation_ids):
+    def relation_emb(self, relation_ids, params):
         #print(relation_ids.size())
         #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
         all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
@@ -225,7 +226,7 @@ class Agent(nn.Module):
     def load(self, path):
         self.load_state_dict(torch.load(path))
 
-    def get_grads(self, rewards, record_action_probs, record_probs):
+    def get_loss(self, rewards, record_action_probs, record_probs):
         # discounted rewards
 
         discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
@@ -256,7 +257,7 @@ class Agent(nn.Module):
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
         self.loss = self.entropy_loss + self.rl_loss
         return self.loss
-        return torch.autograd.grad(self.loss, self.parameters)
+        #return torch.autograd.grad(self.loss, self.parameters)
         #self.optim.zero_grad()
         #self.loss.backward()
         #nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
