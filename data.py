@@ -33,7 +33,8 @@ def tokenize_relation(rel):
     tokens = []
     relations = rel.split('.')
     for this_relation in relations:
-        tokens += this_relation.split('/')[-3:]
+        for _ in this_relation.split('/')[-3:]:
+            tokens+=(_.split('_'))
         tokens.append('[SEP]')
     return tokens[:-1]
 
