@@ -101,13 +101,14 @@ def train(args):
     # build the agent here
     agent = Agent(args)
     agent.cuda()
+    optim = torch.optim.Adam(agent.parameters(), lr=args['alpha2'])
     #print(OrderedDict(agent.named_parameters()))
 
     #meta_learner = MetaLearner(train_env, agent)
 
     for episode in train_env.get_episodes():
         #print('get episode')
-        batch_loss = meta_step(agent, episode, args)
+        batch_loss = meta_step(agent, episode, optim, args)
         #batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         writer.add_scalar('batch_loss', batch_loss, agent.update_steps)
         #writer.add_scalar('avg_reward', avg_reward, agent.update_steps)
@@ -130,11 +131,12 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=few_shot_data)
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
+        episode = episode[0]
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))

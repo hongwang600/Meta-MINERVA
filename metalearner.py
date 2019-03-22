@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torch.autograd import Variable
 from torch.nn.utils.convert_parameters import (vector_to_parameters,
                                                parameters_to_vector)
@@ -72,7 +73,7 @@ def task_loss(agent, episode, args):
     #return batch_loss, avg_reward, success_rate
     return loss
 
-def meta_step(agent, episodes, args):
+def meta_step(agent, episodes, optim, args):
     """Meta-optimization step (ie. update of the initial parameters), based 
     on Trust Region Policy Optimization (TRPO, [4]).
     """
@@ -90,10 +91,20 @@ def meta_step(agent, episodes, args):
     mean_loss = torch.mean(torch.stack(losses, dim=0))
     grads = torch.autograd.grad(mean_loss, agent.parameters(), allow_unused=True)
     '''
+    optim.zero_grad()
     for grads in task_grads:
+        #print('old param')
         for (name, param), grad in zip(agent.named_parameters(), grads):
-            #print(grad)
-            param = param - args['alpha2'] * grad / len(task_grads)
+            #print(param.data)
+            if param.grad is not None:
+                param.grad += grad
+            else:
+                param.grad = grad.clone()
+        #print('new param')
+        #for (name, param), grad in zip(agent.named_parameters(), grads):
+            #print(param.data)
+    nn.utils.clip_grad_norm(agent.parameters(), agent.grad_clip_norm)
+    optim.step()
     del grads
     agent.update_steps += 1
     return np.mean(task_losses)

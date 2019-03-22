@@ -42,11 +42,12 @@ class RelationEntityBatcher():
             #    csv_file = csv.reader(raw_input_file, delimiter = '\t' )
             #    for line in csv_file:
             for line in batcher_triples:
-                    e1 = self.entity_vocab[line[0]]
-                    r = self.relation_vocab[line[1]]
-                    e2 = self.entity_vocab[line[2]]
-                    self.store.append([e1,r,e2])
-                    self.store_all_correct[(e1, r)].add(e2)
+                #print(line)
+                e1 = self.entity_vocab[line[0]]
+                r = self.relation_vocab[line[1]]
+                e2 = self.entity_vocab[line[2]]
+                self.store.append([e1,r,e2])
+                self.store_all_correct[(e1, r)].add(e2)
             self.store = np.array(self.store)
         else:
             #with open(input_file) as raw_input_file:
