@@ -3,6 +3,10 @@ from __future__ import division
 
 import numpy as np
 import torch
+import random
+random.seed(1)
+np.random.seed(1)
+torch.manual_seed(1)
 import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
@@ -12,7 +16,6 @@ from tqdm import tqdm
 import os
 from collections import defaultdict
 import shutil
-import random
 import copy
 from collections import OrderedDict
 
@@ -25,7 +28,6 @@ from data import construct_data, concat_data, get_id_relation, build_vocab
 from metalearner import meta_step
  
 # read parameters
-random.seed(1)
 args = read_options()
 # logging
 logger = logging.getLogger(args['id'])

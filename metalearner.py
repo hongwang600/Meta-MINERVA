@@ -1,4 +1,7 @@
 import torch
+import numpy as np
+torch.manual_seed(1)
+np.random.seed(1)
 import torch.nn as nn
 from torch.autograd import Variable
 from torch.nn.utils.convert_parameters import (vector_to_parameters,
@@ -6,8 +9,7 @@ from torch.nn.utils.convert_parameters import (vector_to_parameters,
 from torch.distributions.kl import kl_divergence
 from collections import OrderedDict
 from agent import Agent
-import numpy as np
-
+from joblib import Parallel, delayed
 #from maml_rl.utils.torch_utils import (weighted_mean, detach_distribution,
 #                                       weighted_normalize)
 #from maml_rl.utils.optimization import conjugate_gradient
@@ -20,24 +22,31 @@ def compute_new_params(agent, episodes, args):
                                                args['alpha1']))
     return task_params
 
+def compute_a_task_grad(agent, task_episode, args):
+    new_params = agent.update_params(task_loss(agent, task_episode, args),
+                                     args['alpha1'])
+    new_agent = Agent(args)
+    new_agent.cuda()
+    new_agent.load_state_dict(new_params)
+    new_loss = task_loss(new_agent, task_episode, args)
+    this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
+    this_task_loss = new_loss.item()
+    #del new_agent
+    #print(task_grads[-1])
+    del new_loss
+    del new_agent
+    del new_params
+    #print(this_task_grad, this_task_loss)
+    return this_task_grad, this_task_loss
+
 def compute_grads(agent, episodes, args):
     task_grads = []
     task_losses = []
-    for task_episode in episodes:
-        new_params = agent.update_params(task_loss(agent, task_episode, args),
-                                         args['alpha1'])
-        new_agent = Agent(args)
-        new_agent.cuda()
-        new_agent.load_state_dict(new_params)
-        new_loss = task_loss(new_agent, task_episode, args)
-        task_grads.append(torch.autograd.grad(new_loss, new_agent.parameters()))
-        task_losses.append(new_loss.item())
-        #del new_agent
-        #print(task_grads[-1])
-        del new_loss
-        del new_agent
-        del new_params
-        #print(task_grads[-1])
+    results = Parallel(n_jobs=8)(delayed(compute_a_task_grad)(agent, _, args) for _ in episodes)
+    #results = [compute_a_task_grad(agent, _, args) for _ in episodes]
+    for task_result in results:
+        task_grads.append(task_result[0])
+        task_losses.append(task_result[1])
     return task_grads, task_losses
 
 def task_loss(agent, episode, args):

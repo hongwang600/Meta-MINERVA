@@ -3,6 +3,8 @@ from __future__ import division
 
 import numpy as np
 import torch
+torch.manual_seed(1)
+np.random.seed(1)
 import torch.nn as nn
 from torch.autograd import Variable
 from torch import optim
