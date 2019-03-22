@@ -24,7 +24,7 @@ def read_options():
     parser.add_argument("--grad_clip_norm", default=5, type=int)
     parser.add_argument("--l2_reg_const", default=1e-2, type=float)
     parser.add_argument("--learning_rate", default=1e-3, type=float)
-    parser.add_argument("--alpha1", default=1e-3, type=float)
+    parser.add_argument("--alpha1", default=1e-1, type=float)
     parser.add_argument("--alpha2", default=1e-3, type=float)
     parser.add_argument("--beta", default=0.01, type=float)
     parser.add_argument("--positive_reward", default=1.0, type=float)
