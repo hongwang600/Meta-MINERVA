@@ -94,5 +94,6 @@ def meta_step(agent, episodes, args):
         for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(grad)
             param = param - args['alpha2'] * grad / len(task_grads)
+    del grads
     agent.update_steps += 1
     return np.mean(task_losses)

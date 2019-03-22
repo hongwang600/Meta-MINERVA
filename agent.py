@@ -242,7 +242,7 @@ class Agent(nn.Module):
         # beta = self.beta * 0.9 ** (self.update_steps // 400)
         beta = self.beta
         # beta = 0.0
-        self.update_steps += 1
+        #self.update_steps += 1
 
         # entropy loss
         record_probs = torch.stack(record_probs, dim=2)
