@@ -25,6 +25,7 @@ class RelationEntityBatcher():
         self.relation_vocab = relation_vocab
         self.mode = mode
         self.create_triple_store(self.input_file, batcher_triples)
+        self.data_size = max(1000, len(batcher_triples))
         # print("batcher loaded")
 
 
@@ -340,10 +341,14 @@ class env(object):
             # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
             batch_generaters = [task_batcher.yield_next_batch_train()
                                 for task_batcher in self.batcher]
+            batcher_data_size = [_.data_size for _ in self.batcher]
+            batcher_pro = [_ / float(sum(batcher_data_size)) for _ in batcher_data_size]
             while True:
                 ret_episodes = []
-                random.shuffle(batch_generaters)
-                for task_batcher in batch_generaters[:self.num_meta_tasks]:
+                #random.shuffle(batch_generaters)
+                sel_batchers = np.random.choice(batch_generaters, self.num_meta_tasks,
+                                                replace=False, p=batcher_pro)
+                for task_batcher in sel_batchers:
                     data = next(task_batcher)
                     # print data[0].shape # (512,)
                     ret_episodes.append(Episode(self.grapher, data, params))
