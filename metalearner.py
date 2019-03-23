@@ -22,13 +22,20 @@ def compute_new_params(agent, episodes, args):
                                                args['alpha1']))
     return task_params
 
-def compute_a_task_grad(agent, task_episode, args):
-    new_params = agent.update_params(task_loss(agent, task_episode, args),
-                                     args['alpha1'])
-    new_agent = Agent(args)
-    new_agent.cuda()
+def compute_a_task_grad(agent, task_episode, args, i):
+    cuda_id = i%4
+    new_agent = Agent(args, cuda_id)
+    new_agent.load_state_dict(agent.state_dict())
+    new_agent.cuda(cuda_id)
+    #print('before loss')
+    #print(cuda_id, 'pass')
+    this_task_loss=task_loss(new_agent, task_episode, args, cuda_id)
+    new_params = new_agent.update_params(this_task_loss,
+                                         args['alpha1'])
+    new_agent = Agent(args, cuda_id)
+    new_agent.cuda(cuda_id)
     new_agent.load_state_dict(new_params)
-    new_loss = task_loss(new_agent, task_episode, args)
+    new_loss = task_loss(new_agent, task_episode, args, cuda_id)
     this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
     this_task_loss = new_loss.item()
     #del new_agent
@@ -37,37 +44,39 @@ def compute_a_task_grad(agent, task_episode, args):
     del new_agent
     del new_params
     #print(this_task_grad, this_task_loss)
+    #for grad in this_task_grad:
+    #    grad.cuda(0)
     return this_task_grad, this_task_loss
 
 def compute_grads(agent, episodes, args):
     task_grads = []
     task_losses = []
-    results = Parallel(n_jobs=8)(delayed(compute_a_task_grad)(agent, _, args) for _ in episodes)
+    results = Parallel(n_jobs=8)(delayed(compute_a_task_grad)(agent, _, args, i) for i, _ in enumerate(episodes))
     #results = [compute_a_task_grad(agent, _, args) for _ in episodes]
     for task_result in results:
         task_grads.append(task_result[0])
         task_losses.append(task_result[1])
     return task_grads, task_losses
 
-def task_loss(agent, episode, args):
-    query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
+def task_loss(agent, episode, args, cuda_id=0):
+    query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda(cuda_id)
     batch_size = query_rels.size()[0]
     state = episode.get_state()
-    pre_rels = Variable(torch.ones(batch_size) * args['relation_vocab']['DUMMY_START_RELATION']).long().cuda()
+    pre_rels = Variable(torch.ones(batch_size) * args['relation_vocab']['DUMMY_START_RELATION']).long().cuda(cuda_id)
     pre_states = agent.init_rnn_states(batch_size)
 
     record_action_probs = []
     record_probs = []
     for step in range(args['path_length']):
-        next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
-        next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
-        curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda()
+        next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda(cuda_id)
+        next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda(cuda_id)
+        curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda(cuda_id)
 
         probs, states = agent(next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents)
         record_probs.append(probs)
         action = torch.multinomial(probs, 1).detach()
         action_flat = action.data.squeeze()
-        action_gather_indice = torch.arange(0, batch_size).long().cuda() * args['max_num_actions'] + action_flat
+        action_gather_indice = torch.arange(0, batch_size).long().cuda(cuda_id) * args['max_num_actions'] + action_flat
         action_prob = probs.view(-1)[action_gather_indice]
         record_action_probs.append(action_prob)
         chosen_relations = next_rels.view(-1)[action_gather_indice]
@@ -94,7 +103,7 @@ def meta_step(agent, episodes, optim, args):
     losses = []
     for i, this_task_param in enumerate(task_params):
         new_agent = Agent(args)
-        new_agent.cuda()
+        new_agent.cuda(cuda_id)
         new_agent.load_state_dict(this_task_param)
         losses.append(task_loss(new_agent, episodes[i], args))
     mean_loss = torch.mean(torch.stack(losses, dim=0))
@@ -106,7 +115,7 @@ def meta_step(agent, episodes, optim, args):
         for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(param.data)
             if param.grad is not None:
-                param.grad += grad
+                param.grad += grad.cuda(0)
             else:
                 param.grad = grad.clone()
         #print('new param')

@@ -51,7 +51,7 @@ class AttnEncoder(nn.Module):
         x_attn = F.softmax(x_attn, dim=1)
         return (x*x_attn).sum(1)
 
-def gen_mask_based_length(lengths):
+def gen_mask_based_length(lengths, cuda_id=0):
     batch_size = len(lengths)
     doc_size = max(lengths)
     masks = torch.ones(batch_size, doc_size)
@@ -60,7 +60,7 @@ def gen_mask_based_length(lengths):
     doc_lengths = torch.tensor(lengths).cpu().view(-1,1)
     doc_lengths_matrix = doc_lengths.expand(-1, doc_size)
     masks[torch.ge(index_matrix-doc_lengths_matrix, 0)] = 0
-    return masks.cuda()
+    return masks.cuda(cuda_id)
 
 class LSTM(nn.Module):
     def __init__(self, arg, vocab_embedding):
@@ -76,19 +76,19 @@ class LSTM(nn.Module):
         self.lstm = Packed(nn.LSTM(embedding_dim, self.hidden_dim,
                                    bidirectional=False))
 
-    def forward(self, padded_sentences, lengths):
+    def forward(self, padded_sentences, lengths, cuda_id=0):
         padded_embeds = self.embedding(padded_sentences)
         #print(len(padded_sentences))
         lstm_out, hidden_state = self.lstm(padded_embeds, lengths)
         lstm_out = lstm_out.permute([1,0,2])
-        mask = gen_mask_based_length(lengths)
+        mask = gen_mask_based_length(lengths, cuda_id)
         return self.pooler(lstm_out, mask)
         #permuted_hidden = hidden_state[0].permute([1,0,2]).contiguous()
         #return permuted_hidden.view(permuted_hidden.size(0), -1)
 
 class Agent(nn.Module):
     """The agent class, it includes model definition and forward functions"""
-    def __init__(self, arg):
+    def __init__(self, arg,cuda_id=0):
         """
         Parameters:
         embed_size --- size of relation/entity embeddings
@@ -101,6 +101,7 @@ class Agent(nn.Module):
 
         """
         super(Agent, self).__init__()
+        self.cuda_id = cuda_id
         for k, v in arg.items(): setattr(self, k, v)
         self.batch_size *= self.num_rollouts
         self.num_relation = len(self.relation_vocab)
@@ -127,9 +128,9 @@ class Agent(nn.Module):
         self.rnns = []
         for i in range(self.policy_layers):
             if i == 0:
-                self.rnns.append(nn.LSTMCell(2*self.embed_size, self.hidden_size).cuda())
+                self.rnns.append(nn.LSTMCell(2*self.embed_size, self.hidden_size).cuda(self.cuda_id))
             else:
-                self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda())
+                self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda(self.cuda_id))
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
@@ -172,7 +173,7 @@ class Agent(nn.Module):
         # states_for_pred = torch.cat((h_, curr_ent_emb.squeeze(), query_rel_emb.squeeze()), dim=1)
         states_for_pred = torch.cat((h_, pre_rel_emb.squeeze(), curr_ent_emb.squeeze(), query_rel_emb.squeeze()), dim=1)
         logits = torch.bmm(action_emb, F.relu(self.hidden_2(F.relu(self.hidden_1(states_for_pred)))).unsqueeze(2)).squeeze() # batch * action_num
-        padded = (torch.ones(next_rels.size()) * self.rPAD).cuda()
+        padded = (torch.ones(next_rels.size()) * self.rPAD).cuda(self.cuda_id)
         padded_actions = torch.eq(padded, next_rels.data.float())
         logits[padded_actions] = -99999.0
         logits = F.softmax(logits)
@@ -187,13 +188,14 @@ class Agent(nn.Module):
         token_lengths = torch.tensor([len(_) for _ in token_ids])
         token_ids = pad_sequence(token_ids)
         #token_ids = self.token_vocab[tokenize_names]
-        return token_ids.cuda(), token_lengths.cuda()
+        return token_ids.cuda(self.cuda_id), token_lengths.cuda(self.cuda_id)
 
     def relation_emb(self, relation_ids, params):
         #print(relation_ids.size())
         #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
         all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
-                                                    self.all_relation_token_lengths)
+                                                    self.all_relation_token_lengths,
+                                                    self.cuda_id)
         set_size = list(relation_ids.size())
         set_size.append(-1)
         ret_rel_emb = all_relation_embeddings[relation_ids.view(-1)]
@@ -203,7 +205,7 @@ class Agent(nn.Module):
     def init_rnn_states(self, batch_size):
         init = []
         for i in range(self.policy_layers):
-            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))  
+            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id)), Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id))))  
         return init
 
     def update(self, rewards, record_action_probs, record_probs):
@@ -231,7 +233,7 @@ class Agent(nn.Module):
 
         # RL loss
         record_action_probs = torch.stack(record_action_probs, dim=1)
-        self.rl_loss = - torch.mean(torch.log(record_action_probs + 1e-8) * Variable(torch.FloatTensor(final_reward)).cuda())
+        self.rl_loss = - torch.mean(torch.log(record_action_probs + 1e-8) * Variable(torch.FloatTensor(final_reward)).cuda(self.cuda_id))
 
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
@@ -280,7 +282,7 @@ class Agent(nn.Module):
 
         # RL loss
         record_action_probs = torch.stack(record_action_probs, dim=1)
-        self.rl_loss = - torch.mean(torch.log(record_action_probs + 1e-8) * Variable(torch.FloatTensor(final_reward)).cuda())
+        self.rl_loss = - torch.mean(torch.log(record_action_probs + 1e-8) * Variable(torch.FloatTensor(final_reward)).cuda(self.cuda_id))
 
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
