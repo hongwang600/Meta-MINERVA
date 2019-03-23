@@ -8,6 +8,8 @@ from collections import defaultdict
 import csv
 import random
 import os
+random.seed(1)
+np.random.seed(1)
 
 
 class RelationEntityBatcher():
