@@ -39,11 +39,35 @@ class Packed(nn.Module):
         h, c = h[:, _indices, :], c[:, _indices, :]
         return outputs, (h, c)
 
+class AttnEncoder(nn.Module):
+    #docstring for ClassName”“”
+    def __init__(self, d_hid):
+        super(AttnEncoder, self).__init__()
+        self.attn_linear = nn.Linear(d_hid, 1, bias=False)
+
+    def forward(self, x, x_mask):
+        x_attn = self.attn_linear(x)
+        x_attn = x_attn - (1 - x_mask.unsqueeze(2))*1e8
+        x_attn = F.softmax(x_attn, dim=1)
+        return (x*x_attn).sum(1)
+
+def gen_mask_based_length(lengths):
+    batch_size = len(lengths)
+    doc_size = max(lengths)
+    masks = torch.ones(batch_size, doc_size)
+    index_matrix = torch.arange(0, doc_size).expand(batch_size, -1)
+    index_matrix = index_matrix.long()
+    doc_lengths = torch.tensor(lengths).cpu().view(-1,1)
+    doc_lengths_matrix = doc_lengths.expand(-1, doc_size)
+    masks[torch.ge(index_matrix-doc_lengths_matrix, 0)] = 0
+    return masks.cuda()
+
 class LSTM(nn.Module):
     def __init__(self, arg, vocab_embedding):
         super(LSTM, self).__init__()
         self.hidden_dim = arg['hidden_size']
         vocab_size, embedding_dim = vocab_embedding.shape
+        self.pooler = AttnEncoder(arg['hidden_size'])
 
         # The LSTM takes word embeddings as inputs, and outputs hidden states
         # with dimensionality hidden_dim.
@@ -56,8 +80,11 @@ class LSTM(nn.Module):
         padded_embeds = self.embedding(padded_sentences)
         #print(len(padded_sentences))
         lstm_out, hidden_state = self.lstm(padded_embeds, lengths)
-        permuted_hidden = hidden_state[0].permute([1,0,2]).contiguous()
-        return permuted_hidden.view(permuted_hidden.size(0), -1)
+        lstm_out = lstm_out.permute([1,0,2])
+        mask = gen_mask_based_length(lengths)
+        return self.pooler(lstm_out, mask)
+        #permuted_hidden = hidden_state[0].permute([1,0,2]).contiguous()
+        #return permuted_hidden.view(permuted_hidden.size(0), -1)
 
 class Agent(nn.Module):
     """The agent class, it includes model definition and forward functions"""
