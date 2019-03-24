@@ -24,6 +24,7 @@ def compute_new_params(agent, episodes, args):
 
 def compute_a_task_grad(agent, task_episode, args, i):
     cuda_id = i%2
+    #cuda_id = 0
     new_agent = Agent(args, cuda_id)
     new_agent.load_state_dict(agent.state_dict())
     new_agent.cuda(cuda_id)
@@ -43,6 +44,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     del new_loss
     del new_agent
     del new_params
+    torch.cuda.empty_cache()
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:
     #    grad.cuda(0)
@@ -51,7 +53,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
 def compute_grads(agent, episodes, args):
     task_grads = []
     task_losses = []
-    results = Parallel(n_jobs=4)(delayed(compute_a_task_grad)(agent, _, args, i) for i, _ in enumerate(episodes))
+    results = Parallel(n_jobs=6)(delayed(compute_a_task_grad)(agent, _, args, i) for i, _ in enumerate(episodes))
     #results = [compute_a_task_grad(agent, _, args) for _ in episodes]
     for task_result in results:
         task_grads.append(task_result[0])
@@ -98,7 +100,7 @@ def meta_step(agent, episodes, optim, args):
     #task_params = compute_new_params(agent, episodes, args)
     #grads = torch.autograd.grad(loss, agent.parameters)
     #grads = parameters_to_vector(grads)
-    task_grads, task_losses = compute_grads(agent.cpu(), episodes, args)
+    task_grads, task_losses = compute_grads(agent, episodes, args)
     '''
     losses = []
     for i, this_task_param in enumerate(task_params):

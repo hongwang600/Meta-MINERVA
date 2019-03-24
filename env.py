@@ -346,7 +346,7 @@ class env(object):
             while True:
                 ret_episodes = []
                 #random.shuffle(batch_generaters)
-                sel_batchers = np.random.choice(batch_generaters, self.num_meta_tasks,
+                sel_batchers = np.random.choice(batch_generaters, min(self.num_meta_tasks, len(batch_generaters)),
                                                 replace=False, p=batcher_pro)
                 for task_batcher in sel_batchers:
                     data = next(task_batcher)
