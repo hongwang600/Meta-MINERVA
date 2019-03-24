@@ -315,10 +315,14 @@ class Agent(nn.Module):
         step-size `step_size`, and returns the updated parameters of the neural 
         network.
         """
-        grads = torch.autograd.grad(loss, self.parameters(),
-            create_graph=not first_order)
+        #grads = torch.autograd.grad(loss, self.parameters(),
+        #    create_graph=not first_order)
+        self.optim.zero_grad()
+        loss.backward()
+        nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
         updated_params = OrderedDict()
-        for (name, param), grad in zip(self.named_parameters(), grads):
-            updated_params[name] = param - step_size * grad
+        #for (name, param), grad in zip(self.named_parameters(), grads):
+        for (name, param) in self.named_parameters():
+            updated_params[name] = param - step_size * param.grad
 
         return updated_params

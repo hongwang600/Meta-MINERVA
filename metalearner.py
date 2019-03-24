@@ -10,6 +10,7 @@ from torch.distributions.kl import kl_divergence
 from collections import OrderedDict
 from agent import Agent
 from joblib import Parallel, delayed
+import math
 #from maml_rl.utils.torch_utils import (weighted_mean, detach_distribution,
 #                                       weighted_normalize)
 #from maml_rl.utils.optimization import conjugate_gradient
@@ -50,14 +51,24 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #    grad.cuda(0)
     return this_task_grad, this_task_loss
 
+def compute_tasks_grad(agent, episodes, args, i):
+    results = []
+    for this_episode in episodes:
+        results.append(compute_a_task_grad(agent, this_episode, args, i))
+    return results
+
 def compute_grads(agent, episodes, args):
     task_grads = []
     task_losses = []
-    results = Parallel(n_jobs=6)(delayed(compute_a_task_grad)(agent, _, args, i) for i, _ in enumerate(episodes))
+    chunk_size = 4
+    num_chunks = math.ceil(len(episodes) / chunk_size)
+    results = Parallel(n_jobs=8)(delayed(compute_tasks_grad)(agent, episodes[chunk_id*chunk_size:(chunk_id+1)*chunk_size], args, chunk_id)
+                                 for chunk_id in range(num_chunks))
     #results = [compute_a_task_grad(agent, _, args) for _ in episodes]
-    for task_result in results:
-        task_grads.append(task_result[0])
-        task_losses.append(task_result[1])
+    for chunk_result in results:
+        for task_result in chunk_result:
+            task_grads.append(task_result[0])
+            task_losses.append(task_result[1])
     return task_grads, task_losses
 
 def task_loss(agent, episode, args, cuda_id=0):
