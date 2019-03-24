@@ -148,6 +148,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
         writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
         writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
         writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
+    writer.close()
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 
