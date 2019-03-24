@@ -68,7 +68,7 @@ def train_one_episode(agent, episode):
     state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_reward()
-    batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs)
+    batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True)
     success_rate = np.sum(rewards) / batch_size
     return batch_loss, avg_reward, success_rate
 
@@ -161,6 +161,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
         writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
         writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
         writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
+    writer.close()
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 

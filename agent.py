@@ -88,7 +88,7 @@ class LSTM(nn.Module):
 
 class Agent(nn.Module):
     """The agent class, it includes model definition and forward functions"""
-    def __init__(self, arg,cuda_id=0):
+    def __init__(self, arg,cuda_id=0, use_sgd=False):
         """
         Parameters:
         embed_size --- size of relation/entity embeddings
@@ -136,7 +136,10 @@ class Agent(nn.Module):
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
         self.update_steps = 0
-        self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+        if not use_sgd:
+            self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+        else:
+            self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
 
         # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
@@ -208,7 +211,11 @@ class Agent(nn.Module):
             init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id)), Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id))))  
         return init
 
-    def update(self, rewards, record_action_probs, record_probs):
+    def decay_lr(self):
+        for param_group in self.optim.param_groups:
+            param_group['lr'] = max(1e-3, param_group['lr']*0.01)
+
+    def update(self, rewards, record_action_probs, record_probs, decay_lr=False):
         # discounted rewards
 
         discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
@@ -242,6 +249,8 @@ class Agent(nn.Module):
         self.loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
         self.optim.step()
+        if decay_lr:
+            self.decay_lr()
 
         # # decrease the learning rate here
         # if self.update_steps % 500 == 0 and self.update_steps > 0:
