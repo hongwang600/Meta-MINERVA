@@ -133,7 +133,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
             break
     return np.array(test_scores)
 
-def meta_test(agent, args, writer, few_shot_data, test_data):
+def abandoned_meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
     task_results = np.zeros([num_meta_step+1, 6])
     for task in few_shot_data:
