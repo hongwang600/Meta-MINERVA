@@ -24,8 +24,8 @@ def compute_new_params(agent, episodes, args):
     return task_params
 
 def compute_a_task_grad(agent, task_episode, args, i):
-    #cuda_id = i%2
-    cuda_id = 0
+    cuda_id = i%4
+    #cuda_id = 0
     new_agent = Agent(args, cuda_id)
     new_agent.load_state_dict(agent.state_dict())
     new_agent.cuda(cuda_id)
@@ -34,6 +34,9 @@ def compute_a_task_grad(agent, task_episode, args, i):
     this_task_loss=task_loss(new_agent, task_episode[0], args, cuda_id)
     new_params = new_agent.update_params(this_task_loss,
                                          args['alpha1'])
+    #del agent
+    del this_task_loss
+    del new_agent
     new_agent = Agent(args, cuda_id)
     new_agent.cuda(cuda_id)
     new_agent.load_state_dict(new_params)
@@ -60,12 +63,13 @@ def compute_tasks_grad(agent, episodes, args, i):
 def compute_grads(agent, episodes, args):
     task_grads = []
     task_losses = []
-    chunk_size = 3
+    chunk_size = 5
     num_chunks = math.ceil(len(episodes) / chunk_size)
-    results = Parallel(n_jobs=3)(delayed(compute_tasks_grad)(agent, episodes[chunk_id*chunk_size:(chunk_id+1)*chunk_size], args, chunk_id)
+    results = Parallel(n_jobs=4, backend="threading")(delayed(compute_tasks_grad)(agent, episodes[chunk_id*chunk_size:(chunk_id+1)*chunk_size], args, chunk_id)
                                  for chunk_id in range(num_chunks))
-    #results = [compute_a_task_grad(agent, _, args) for _ in episodes]
+    #results = [compute_a_task_grad(agent, _, args, 0) for _ in episodes]
     for chunk_result in results:
+    #for chunk_result in [results]:
         for task_result in chunk_result:
             task_grads.append(task_result[0])
             task_losses.append(task_result[1])
@@ -127,15 +131,26 @@ def meta_step(agent, episodes, optim, args):
         #print('old param')
         for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(param.data)
+            #param.data -= args['alpha2']*grad
             if param.grad is not None:
                 param.grad += grad.cuda(0)
             else:
-                param.grad = grad.cuda(0).clone()
+                param.grad = grad.cuda(0)
         #print('new param')
         #for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(param.data)
     nn.utils.clip_grad_norm(agent.parameters(), agent.grad_clip_norm)
+    #for (name, param) in agent.named_parameters()::
+    #    param.data -= args['alpha2']*param.grad
+    #    del param.grad
     optim.step()
-    del task_grads
+    for grads in task_grads:
+        for grad in grads:
+            del grad
+    for param in agent.parameters():
+        grad = param.grad
+        param.grad = None
+        del grad
+    torch.cuda.empty_cache()
     agent.update_steps += 1
     return np.mean(task_losses)
