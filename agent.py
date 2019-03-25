@@ -156,13 +156,13 @@ class Agent(nn.Module):
         #if params is None:
         #    params = OrderedDict(self.named_parameters())
 
-        next_rel_emb = self.relation_emb(next_rels, params)
+        next_rel_emb = self.relation_emb(next_rels)
         next_ent_emb = self.entity_emb(next_ents)
         action_emb = torch.cat((next_rel_emb, next_ent_emb), dim=2) # batch_size * action_num * 2d
 
-        query_rel_emb = self.relation_emb(query_rels, params)
+        query_rel_emb = self.relation_emb(query_rels)
         curr_ent_emb = self.entity_emb(curr_ents)
-        pre_rel_emb = self.relation_emb(pre_rels, params)
+        pre_rel_emb = self.relation_emb(pre_rels)
 
         # update RNN states
         inputs = torch.cat((pre_rel_emb, curr_ent_emb), dim=1)
@@ -193,7 +193,7 @@ class Agent(nn.Module):
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(self.cuda_id), token_lengths.cuda(self.cuda_id)
 
-    def relation_emb(self, relation_ids, params):
+    def relation_emb(self, relation_ids):
         #print(relation_ids.size())
         #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
         all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
