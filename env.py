@@ -17,11 +17,10 @@ class RelationEntityBatcher():
     creates an indexed graph, store the answer entities for each query
     '''
     def __init__(self, input_dir, batch_size, entity_vocab, relation_vocab,
-                 mode="train", batcher_triples=[], basic_graph=[]):
+                 mode="train", batcher_triples=[]):
         self.input_dir = input_dir
         self.input_file = input_dir+'/{0}.txt'.format(mode)
         self.batch_size = batch_size
-        self.basic_graph = basic_graph
         self.entity_vocab = entity_vocab
         self.relation_vocab = relation_vocab
         self.mode = mode
@@ -55,11 +54,6 @@ class RelationEntityBatcher():
                     e2 = self.entity_vocab[line[2]]
                     self.store.append([e1,r,e2])
                     self.store_all_correct[(e1, r)].add(e2)
-            for line in self.basic_graph:
-                e1 = line[0]
-                r = line[1]
-                e2 = line[2]
-                self.store_all_correct[(e1, r)].add(e2)
             self.store = np.array(self.store)
         else:
             #with open(input_file) as raw_input_file:
@@ -310,7 +304,7 @@ class Episode(object):
 
 
 class env(object):
-    def __init__(self, params, mode='train', batcher_triples=[], dev_triple=None, basic_graph=[]):
+    def __init__(self, params, mode='train', batcher_triples=[], dev_triple=None):
 
         self.batch_size = params['batch_size']
         self.num_rollouts = params['num_rollouts']
@@ -330,8 +324,7 @@ class env(object):
                                                               batch_size=params['batch_size'],
                                                               entity_vocab=params['entity_vocab'],
                                                               relation_vocab=params['relation_vocab'],
-                                                              batcher_triples=_,
-                                                              basic_graph=basic_graph
+                                                              batcher_triples=_
                                                             ))
             else:
                 for name, triples in batcher_triples.items():
@@ -340,15 +333,13 @@ class env(object):
                                                                   batch_size=params['batch_size'],
                                                                   entity_vocab=params['entity_vocab'],
                                                                   relation_vocab=params['relation_vocab'],
-                                                                  batcher_triples=triples,
-                                                                  basic_graph=basic_graph
+                                                                  batcher_triples=triples
                                                                 ))
                         self.dev_batcher.append(RelationEntityBatcher(input_dir=input_dir,
                                                                   batch_size=params['batch_size'],
                                                                   entity_vocab=params['entity_vocab'],
                                                                   relation_vocab=params['relation_vocab'],
-                                                                  batcher_triples=dev_triple[name],
-                                                                  basic_graph=basic_graph
+                                                                  batcher_triples=dev_triple[name]
                                                                 ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,

@@ -90,7 +90,7 @@ def train(args):
     dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
 
     #print(len(train_data.values()))
-    train_env = env(args, mode='train', batcher_triples=train_data, dev_triple = dev_data, basic_graph=concated_train_data)
+    train_env = env(args, mode='train', batcher_triples=train_data, dev_triple = dev_data)
     #train_env = env(args, mode='train', batcher_triples=train_data.values())
     #print('load all envs')
 
@@ -127,14 +127,14 @@ def train(args):
             break
     meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
-def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step, basic_graph):
+def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
     agent = Agent(args)
     agent.cuda()
     agent.load_state_dict(ori_agent.state_dict())
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data], basic_graph=basic_graph)
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
@@ -147,12 +147,12 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
             break
     return np.array(test_scores)
 
-def meta_test(agent, args, writer, few_shot_data, test_data, basic_graph):
+def meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
     task_results = np.zeros([num_meta_step+1, 6])
     for task in few_shot_data:
         task_results += single_task_meta_test(agent, args, few_shot_data[task],
-                                              test_data[task], num_meta_step, basic_graph)
+                                              test_data[task], num_meta_step)
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):
