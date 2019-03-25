@@ -17,10 +17,11 @@ class RelationEntityBatcher():
     creates an indexed graph, store the answer entities for each query
     '''
     def __init__(self, input_dir, batch_size, entity_vocab, relation_vocab,
-                 mode="train", batcher_triples=[]):
+                 mode="train", batcher_triples=[], basic_graph=[]):
         self.input_dir = input_dir
         self.input_file = input_dir+'/{0}.txt'.format(mode)
         self.batch_size = batch_size
+        self.basic_graph = basic_graph
         self.entity_vocab = entity_vocab
         self.relation_vocab = relation_vocab
         self.mode = mode
@@ -45,10 +46,19 @@ class RelationEntityBatcher():
             #    for line in csv_file:
             for line in batcher_triples:
                 #print(line)
-                e1 = self.entity_vocab[line[0]]
-                r = self.relation_vocab[line[1]]
-                e2 = self.entity_vocab[line[2]]
-                self.store.append([e1,r,e2])
+                e1 = line[0]
+                r = line[1]
+                e2 = line[2]
+                if e1 in self.entity_vocab and e2 in self.entity_vocab:
+                    e1 = self.entity_vocab[line[0]]
+                    r = self.relation_vocab[line[1]]
+                    e2 = self.entity_vocab[line[2]]
+                    self.store.append([e1,r,e2])
+                    self.store_all_correct[(e1, r)].add(e2)
+            for line in self.basic_graph:
+                e1 = line[0]
+                r = line[1]
+                e2 = line[2]
                 self.store_all_correct[(e1, r)].add(e2)
             self.store = np.array(self.store)
         else:
@@ -300,7 +310,7 @@ class Episode(object):
 
 
 class env(object):
-    def __init__(self, params, mode='train', batcher_triples=[]):
+    def __init__(self, params, mode='train', batcher_triples=[], dev_triple=None, basic_graph=[]):
 
         self.batch_size = params['batch_size']
         self.num_rollouts = params['num_rollouts']
@@ -311,15 +321,35 @@ class env(object):
         self.test_rollouts = params['test_rollouts']
         self.num_meta_tasks = params['num_meta_tasks']
         input_dir = params['data_input_dir']
+        self.dev_batcher = []
         if mode == 'train':
             self.batcher = []
-            for _ in batcher_triples:
-                self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
-                                                          batch_size=params['batch_size'],
-                                                          entity_vocab=params['entity_vocab'],
-                                                          relation_vocab=params['relation_vocab'],
-                                                          batcher_triples=_
-                                                          ))
+            if dev_triple is None:
+                for _ in batcher_triples:
+                    self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                                              batch_size=params['batch_size'],
+                                                              entity_vocab=params['entity_vocab'],
+                                                              relation_vocab=params['relation_vocab'],
+                                                              batcher_triples=_,
+                                                              basic_graph=basic_graph
+                                                            ))
+            else:
+                for name, triples in batcher_triples.items():
+                    if len(dev_triple) >0 and len(dev_triple[name])>0:
+                        self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                                                  batch_size=params['batch_size'],
+                                                                  entity_vocab=params['entity_vocab'],
+                                                                  relation_vocab=params['relation_vocab'],
+                                                                  batcher_triples=triples,
+                                                                  basic_graph=basic_graph
+                                                                ))
+                        self.dev_batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                                                  batch_size=params['batch_size'],
+                                                                  entity_vocab=params['entity_vocab'],
+                                                                  relation_vocab=params['relation_vocab'],
+                                                                  batcher_triples=dev_triple[name],
+                                                                  basic_graph=basic_graph
+                                                                ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
@@ -341,17 +371,24 @@ class env(object):
             # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
             batch_generaters = [task_batcher.yield_next_batch_train()
                                 for task_batcher in self.batcher]
+            dev_batch_generaters = [task_batcher.yield_next_batch_train()
+                                for task_batcher in self.dev_batcher]
             batcher_data_size = [_.data_size for _ in self.batcher]
             batcher_pro = [_ / float(sum(batcher_data_size)) for _ in batcher_data_size]
             while True:
                 ret_episodes = []
                 #random.shuffle(batch_generaters)
-                sel_batchers = np.random.choice(batch_generaters, min(self.num_meta_tasks, len(batch_generaters)),
+                indexs = list(range(len(batch_generaters)))
+                sel_indexs = np.random.choice(indexs, min(self.num_meta_tasks, len(batch_generaters)),
                                                 replace=False, p=batcher_pro)
-                for task_batcher in sel_batchers:
-                    data = next(task_batcher)
+                for i in sel_indexs:
+                    data = next(batch_generaters[i])
                     # print data[0].shape # (512,)
-                    ret_episodes.append(Episode(self.grapher, data, params))
+                    if len(dev_batch_generaters) == 0:
+                        ret_episodes.append(Episode(self.grapher, data, params))
+                    else:
+                        dev_data = next(dev_batch_generaters[i])
+                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params)])
                 yield ret_episodes
         else:
             for data in self.batcher.yield_next_batch_test():
