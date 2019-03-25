@@ -136,6 +136,6 @@ def meta_step(agent, episodes, optim, args):
             #print(param.data)
     nn.utils.clip_grad_norm(agent.parameters(), agent.grad_clip_norm)
     optim.step()
-    del grads
+    del task_grads
     agent.update_steps += 1
     return np.mean(task_losses)
