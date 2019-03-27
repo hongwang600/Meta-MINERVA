@@ -70,31 +70,9 @@ def train_one_episode(agent, episode):
     success_rate = np.sum(rewards) / batch_size
     return batch_loss, avg_reward, success_rate
 
-def train(args):
-    data = construct_data(args)
-    id_rels = get_id_relation(args)
-    my_vocab = build_vocab(args)
-    #print(len(id_rels))
-    train_data, dev_data, meta_dev_data, few_shot_dev_data = data
-    concated_train_data = concat_data(train_data)
-    concated_dev_data = concat_data(dev_data)
-    random.shuffle(concated_train_data)
-    random.shuffle(concated_dev_data)
-    #print(concated_dev_data)
-    logger.info('start training')
-
-    # build the train and validation environment here
-    train_env = env(args, mode='train', batcher_triples=concated_train_data)
-    dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
-
-    if os.path.exists('logs/' + args['id']):
-        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
-
-    writer = SummaryWriter('logs/' + args['id'])
-
-    beta = args['beta']
-
-    # build the agent here
+def train_on_dataset(train_data, dev_data, writer, args):
+    train_env = env(args, mode='train', batcher_triples=train_data)
+    dev_env = env(args, mode='dev', batcher_triples=dev_data)
     agent = Agent(args)
     agent.cuda()
 
@@ -112,7 +90,71 @@ def train(args):
         if agent.update_steps > args['total_iterations']:
             agent.save(args['save_path'])
             break
-    meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
+    return agent
+
+def task_test(agent, args, writer, test_data, task_results, task_id):
+    test_env = env(args, mode='dev', batcher_triples=test_data)
+    test_scores = test(agent, args, None, test_env)
+    task_results += np.array(test_scores) 
+    pre_str = 'ablation_'
+    writer.add_scalar(pre_str+'Hits1', test_scores[0], task_id)
+    writer.add_scalar(pre_str+'Hits3', test_scores[1], task_id)
+    writer.add_scalar(pre_str+'Hits5', test_scores[2], task_id)
+    writer.add_scalar(pre_str+'Hits10', test_scores[3], task_id)
+    writer.add_scalar(pre_str+'Hits20', test_scores[4], task_id)
+    writer.add_scalar(pre_str+'AUC', test_scores[5], task_id)
+    #writer.close()
+    return task_results
+
+def train(args):
+    data = construct_data(args)
+    id_rels = get_id_relation(args)
+    my_vocab = build_vocab(args)
+    #print(len(id_rels))
+    train_data, dev_data, meta_dev_data, meta_train_data = data
+    concated_train_data = concat_data(train_data)
+    concated_dev_data = concat_data(dev_data)
+    concated_meta_train_data = concat_data(meta_train_data)
+    concated_meta_dev_data = concat_data(meta_dev_data)
+    #for task in meta_train_data:
+    #    if len(meta_dev_data[task]) > 0:
+    #        concated_meta_train_data += meta_train_data[task]
+    #        concated_meta_dev_data += meta_dev_data[task]
+    #random.shuffle(concated_train_data)
+    #random.shuffle(concated_dev_data)
+    #print(concated_dev_data)
+    logger.info('start training')
+
+    # build the train and validation environment here
+
+    if os.path.exists('logs/' + args['id']):
+        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
+
+    writer = SummaryWriter('logs/' + args['id'])
+
+    task_results = np.zeros(6)
+    count = 0
+    to_train_data = concated_meta_train_data + concated_train_data
+    to_dev_data = concated_meta_dev_data + concated_dev_data
+    random.shuffle(to_train_data)
+    random.shuffle(to_dev_data)
+    agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
+    for task_id, task in enumerate(meta_train_data):
+        if len(meta_dev_data[task])>0:
+            count += 1
+            #agent = train_on_dataset(meta_train_data[task], meta_dev_data[task], writer, args)
+            task_results = task_test(agent, args, writer, meta_dev_data[task], task_results, task_id)
+    task_results /= count
+    print(task_results)
+    pre_str = 'ablation_'
+    writer.add_scalar(pre_str+'Hits1', task_results[0], count)
+    writer.add_scalar(pre_str+'Hits3', task_results[1], count)
+    writer.add_scalar(pre_str+'Hits5', task_results[2], count)
+    writer.add_scalar(pre_str+'Hits10', task_results[3], count)
+    writer.add_scalar(pre_str+'Hits20', task_results[4], count)
+    writer.add_scalar(pre_str+'AUC', task_results[5], count)
+    writer.close()
+
 
 def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
     agent = Agent(args)
@@ -133,22 +175,6 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
             break
     return np.array(test_scores)
 
-def abandoned_meta_test(agent, args, writer, few_shot_data, test_data):
-    num_meta_step = args['meta_step']
-    task_results = np.zeros([num_meta_step+1, 6])
-    for task in few_shot_data:
-        task_results += single_task_meta_test(agent, args, few_shot_data[task],
-                                              test_data[task], num_meta_step)
-    task_results /= len(few_shot_data)
-    pre_str = 'meta_'
-    for i in range(len(task_results)):
-        writer.add_scalar(pre_str+'Hits1', task_results[i][0], i)
-        writer.add_scalar(pre_str+'Hits3', task_results[i][1], i)
-        writer.add_scalar(pre_str+'Hits5', task_results[i][2], i)
-        writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
-        writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
-        writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
-    writer.close()
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 

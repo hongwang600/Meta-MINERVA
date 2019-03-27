@@ -11,9 +11,8 @@ def construct_data(args):
     dev_data = read_json_data(input_dir+'/'+args['dev_file'])
     meta_dev_data = read_json_data(input_dir+'/'+args['meta_dev_file'])
     few_shot_dev_data = read_json_data(input_dir+'/'+args['few_shot_dev_file'])
-    for task in few_shot_dev_data:
-        few_shot_dev_data[task] = few_shot_dev_data[task][:args['few_shot_size']]
-    few_shot_dev_data = few_shot_dev_data
+    #for task in few_shot_dev_data:
+    #    few_shot_dev_data[task] = few_shot_dev_data[task][:args['few_shot_size']]
     return [train_data, dev_data, meta_dev_data, few_shot_dev_data]
 
 def concat_data(data):
