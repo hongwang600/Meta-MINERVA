@@ -310,13 +310,21 @@ class env(object):
         input_dir = params['data_input_dir']
         if mode == 'train':
             self.batcher=[]
-            for task_name, triples in batcher_triples.items():
+            if type(batcher_triples) is dict:
+                for task_name, triples in batcher_triples.items():
+                    self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                         batch_size=params['batch_size'],
+                                         entity_vocab=params['entity_vocab'],
+                                         relation_vocab=params['relation_vocab'],
+                                         batcher_triples=triples
+                                         ))
+            else:
                 self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
-                                     batch_size=params['batch_size'],
-                                     entity_vocab=params['entity_vocab'],
-                                     relation_vocab=params['relation_vocab'],
-                                     batcher_triples=triples
-                                     ))
+                    batch_size=params['batch_size'],
+                    entity_vocab=params['entity_vocab'],
+                    relation_vocab=params['relation_vocab'],
+                    batcher_triples=batcher_triples
+                    ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
