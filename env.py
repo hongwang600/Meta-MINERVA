@@ -309,12 +309,14 @@ class env(object):
         self.test_rollouts = params['test_rollouts']
         input_dir = params['data_input_dir']
         if mode == 'train':
-            self.batcher = RelationEntityBatcher(input_dir=input_dir,
-                                                 batch_size=params['batch_size'],
-                                                 entity_vocab=params['entity_vocab'],
-                                                 relation_vocab=params['relation_vocab'],
-                                                 batcher_triples=batcher_triples
-                                                 )
+            self.batcher=[]
+            for task_name, triples in batcher_triples.items():
+                self.batcher.append(RelationEntityBatcher(input_dir=input_dir,
+                                     batch_size=params['batch_size'],
+                                     entity_vocab=params['entity_vocab'],
+                                     relation_vocab=params['relation_vocab'],
+                                     batcher_triples=triples
+                                     ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
@@ -333,10 +335,12 @@ class env(object):
     def get_episodes(self):
         params = self.batch_size, self.path_len, self.num_rollouts, self.test_rollouts, self.positive_reward, self.negative_reward, self.mode, self.batcher
         if self.mode == 'train':
-            # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
-            for data in self.batcher.yield_next_batch_train():
-
-                # print data[0].shape # (512,)
+            batch_generaters = [task_batcher.yield_next_batch_train()
+                                    for task_batcher in self.batcher]
+            while True:
+                # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
+                sel_generater = random.sample(batch_generaters, 1)[0]
+                data = next(sel_generater)
 
                 yield Episode(self.grapher, data, params)
         else:
