@@ -2,6 +2,8 @@ import json
 import gluonnlp
 
 def read_json_data(file_name):
+    if file_name[-4:] == 'None':
+        return {}
     with open(file_name) as f_in:
         return json.load(f_in)
 
