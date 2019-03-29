@@ -144,11 +144,11 @@ def train(args):
     #to_dev_data = concated_meta_dev_data
     random.shuffle(to_train_data)
     random.shuffle(to_dev_data)
-    #agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
+    agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
     for task_id, task in enumerate(train_data):
         if len(dev_data[task])>0:
             count += 1
-            agent = train_on_dataset(train_data[task], dev_data[task], writer, args)
+            #agent = train_on_dataset(train_data[task], dev_data[task], writer, args)
             task_results = task_test(agent, args, writer, dev_data[task], task_results, task_id)
             del agent
     task_results /= count
