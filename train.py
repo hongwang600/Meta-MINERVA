@@ -145,12 +145,15 @@ def train(args):
     random.shuffle(to_train_data)
     random.shuffle(to_dev_data)
     agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
+    #agent = Agent(args)
+    #agent.cuda()
+    #agent.load(args['save_path'])
     for task_id, task in enumerate(train_data):
         if len(dev_data[task])>0:
             count += 1
             #agent = train_on_dataset(train_data[task], dev_data[task], writer, args)
             task_results = task_test(agent, args, writer, dev_data[task], task_results, task_id)
-            del agent
+            #del agent
     task_results /= count
     print(task_results)
     pre_str = 'ablation_'
