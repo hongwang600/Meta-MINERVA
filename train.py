@@ -127,15 +127,17 @@ def train(args):
 
     # build the train and validation environment here
 
-    if os.path.exists('logs/' + args['id']):
-        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
+    if os.path.exists(args['log_dir'] + args['id']):
+        shutil.rmtree(args['log_dir'] + args['id'], ignore_errors=True)
 
-    writer = SummaryWriter('logs/' + args['id'])
+    writer = SummaryWriter(args['log_dir'] + args['id'])
 
     task_results = np.zeros(6)
     count = 0
     to_train_data = concated_meta_train_data + concated_train_data
-    to_dev_data = concated_meta_dev_data + concated_dev_data
+    #to_dev_data = concated_meta_dev_data + concated_dev_data
+    to_dev_data = to_train_data[:2000]
+    to_train_data = to_train_data[:-2000]
     #to_train_data = concated_meta_train_data
     #to_dev_data = concated_meta_dev_data
     #to_train_data = meta_train_data
@@ -145,12 +147,12 @@ def train(args):
     random.shuffle(to_train_data)
     random.shuffle(to_dev_data)
     agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
-    for task_id, task in enumerate(train_data):
-        if len(dev_data[task])>0:
+    for task_id, task in enumerate(meta_train_data):
+        if len(meta_dev_data[task])>0:
             count += 1
-            #agent = train_on_dataset(train_data[task], dev_data[task], writer, args)
-            task_results = task_test(agent, args, writer, dev_data[task], task_results, task_id)
-            del agent
+            #agent = train_on_dataset(meta_train_data[task], meta_dev_data[task], writer, args)
+            task_results = task_test(agent, args, writer, meta_dev_data[task], task_results, task_id)
+            #del agent
     task_results /= count
     print(task_results)
     pre_str = 'ablation_'

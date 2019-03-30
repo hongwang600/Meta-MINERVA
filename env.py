@@ -207,8 +207,8 @@ class RelationEntityGrapher:
                 relations = ret[i, :, 1] # all linked relations
                 entities = ret[i, :, 0]
                 mask = np.logical_and(relations == query_relations[i] , entities == answers[i]) # at the start point, mask out the direction link that can arrive at the answer
-                ret[i, :, 0][mask] = self.ePAD
-                ret[i, :, 1][mask] = self.rPAD
+                #ret[i, :, 0][mask] = self.ePAD
+                #ret[i, :, 1][mask] = self.rPAD
             if last_step:
                 # mask out other correct answers at the last step
                 entities = ret[i, :, 0]
