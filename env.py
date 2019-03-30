@@ -184,13 +184,15 @@ class RelationEntityGrapher:
         '''
         action array "array_store" saves the action for each entity, each action is consists of the relation link and the next entity
         '''
-        with open(self.triple_store) as triple_file_raw:
-            triple_file = csv.reader(triple_file_raw, delimiter='\t')
-            for line in triple_file:
-                e1 = self.entity_vocab[line[0]]
-                r = self.relation_vocab[line[1]]
-                e2 = self.entity_vocab[line[2]]
-                self.store[e1].append((r, e2)) # store record the out links for each entity
+        for file_name in self.triple_store:
+            with open(file_name) as triple_file_raw:
+                triple_file = csv.reader(triple_file_raw, delimiter='\t')
+                for line in triple_file:
+                    if line[0] in self.entity_vocab and line[1] in self.relation_vocab and line[2] in self.entity_vocab:
+                        e1 = self.entity_vocab[line[0]]
+                        r = self.relation_vocab[line[1]]
+                        e2 = self.entity_vocab[line[2]]
+                        self.store[e1].append((r, e2)) # store record the out links for each entity
 
         for e1 in self.store:
             num_actions = 1
@@ -213,8 +215,8 @@ class RelationEntityGrapher:
                 relations = ret[i, :, 1] # all linked relations
                 entities = ret[i, :, 0]
                 mask = np.logical_and(relations == query_relations[i] , entities == answers[i]) # at the start point, mask out the direction link that can arrive at the answer
-                ret[i, :, 0][mask] = self.ePAD
-                ret[i, :, 1][mask] = self.rPAD
+                #ret[i, :, 0][mask] = self.ePAD
+                #ret[i, :, 1][mask] = self.rPAD
             if last_step:
                 # mask out other correct answers at the last step
                 entities = ret[i, :, 0]
@@ -351,7 +353,7 @@ class env(object):
                                                  )
 
             self.total_no_examples = self.batcher.store.shape[0]
-        self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'graph.txt',
+        self.grapher = RelationEntityGrapher(triple_store=[params['data_input_dir'] + '/' + 'graph.txt', params['data_input_dir']+'/'+'dev.txt'],
                                              max_num_actions=params['max_num_actions'],
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])

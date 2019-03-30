@@ -30,7 +30,7 @@ def read_options():
     parser.add_argument("--positive_reward", default=1.0, type=float)
     parser.add_argument("--negative_reward", default=0, type=float)
     parser.add_argument("--gamma", default=1, type=float)
-    parser.add_argument("--log_dir", default="./logs/", type=str)
+    parser.add_argument("--log_dir", default="./one_step_exp_logs/", type=str)
     # parser.add_argument("--log_file_name", default="reward.txt", type=str)
     parser.add_argument("--output_file", default="", type=str)
     parser.add_argument("--num_rollouts", default=20, type=int)
@@ -42,7 +42,7 @@ def read_options():
 
     parser.add_argument("--Lambda", default=0.0, type=float)
     parser.add_argument("--pool", default="max", type=str)
-    parser.add_argument("--eval_every", default=100, type=int)
+    parser.add_argument("--eval_every", default=10, type=int)
     # parser.add_argument("--use_entity_embeddings", aciton='store_true')
     parser.add_argument("--train_entity_embeddings", action='store_true')
     parser.add_argument("--train_relation_embeddings", action='store_true')

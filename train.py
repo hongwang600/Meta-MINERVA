@@ -94,10 +94,10 @@ def train(args):
     #train_env = env(args, mode='train', batcher_triples=train_data.values())
     #print('load all envs')
 
-    if os.path.exists('logs/' + args['id']):
-        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
+    if os.path.exists(args['log_dir'] + args['id']):
+        shutil.rmtree(args['log_dir'] + args['id'], ignore_errors=True)
 
-    writer = SummaryWriter('logs/' + args['id'])
+    writer = SummaryWriter(args['log_dir'] + args['id'])
 
     beta = args['beta']
 
@@ -120,19 +120,20 @@ def train(args):
         #logger.info('success_rate at iter %d: %f' % (agent.update_steps, success_rate))
 
         if agent.update_steps % args['eval_every'] == 0:
-            test(agent, args, writer, dev_env)
+            meta_test(agent, args, writer, train_data, dev_data)
 
         if agent.update_steps > args['total_iterations']:
             agent.save(args['save_path'])
             break
-    meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
+    writer.close()
 
 def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
     agent = Agent(args)
     agent.cuda()
     agent.load_state_dict(ori_agent.state_dict())
     #print(agent.update_steps)
-    agent.update_steps = 0
+    start_step = agent.update_steps
+    #agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
@@ -143,26 +144,33 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))
-        if agent.update_steps == training_step:
+        if agent.update_steps == start_step+training_step:
             break
+    agent.update_steps=start_step
     return np.array(test_scores)
 
 def meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
-    task_results = np.zeros([num_meta_step+1, 6])
-    for task in few_shot_data:
-        task_results += single_task_meta_test(agent, args, few_shot_data[task],
-                                              test_data[task], num_meta_step)
-    task_results /= len(few_shot_data)
+    task_results = np.zeros([2, 6])
+    task_names = list(few_shot_data.keys())
+    random.shuffle(task_names)
+    for task in task_names[:10]:
+        few_shot_train = few_shot_data[task][:200]
+        few_shot_dev = test_data[task][:200]
+        random.shuffle(few_shot_train)
+        random.shuffle(few_shot_dev)
+        task_results += single_task_meta_test(agent, args, few_shot_train,
+                                              few_shot_dev, 1)
+    task_results /= len(task_names[:10])
     pre_str = 'meta_'
     for i in range(len(task_results)):
-        writer.add_scalar(pre_str+'Hits1', task_results[i][0], i)
-        writer.add_scalar(pre_str+'Hits3', task_results[i][1], i)
-        writer.add_scalar(pre_str+'Hits5', task_results[i][2], i)
-        writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
-        writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
-        writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
-    writer.close()
+        writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits3', task_results[i][1], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits5', task_results[i][2], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits10', task_results[i][3], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits20', task_results[i][4], agent.update_steps+i)
+        writer.add_scalar(pre_str+'AUC', task_results[i][5], agent.update_steps+i)
+    #writer.close()
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 
