@@ -50,6 +50,7 @@ def train_one_episode(agent, episode):
     record_action_probs = []
     record_probs = []
     for step in range(args['path_length']):
+        #print('one_step', step)
         next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
         next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
         curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda()
@@ -65,9 +66,10 @@ def train_one_episode(agent, episode):
 
         pre_states = states
         pre_rels = chosen_relations
-    state = episode(action_flat.cpu().numpy())
+        state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_acc_reward()
+    #print(rewards.shape)
     batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True)
     success_rate = np.sum(rewards[-1]) / batch_size
     return batch_loss, avg_reward, success_rate
@@ -119,6 +121,7 @@ def train(args):
         logger.info('batch_loss at iter %d: %f' % (agent.update_steps, batch_loss))
         #logger.info('success_rate at iter %d: %f' % (agent.update_steps, success_rate))
 
+        #one_step_meta_test(agent, args, writer, train_data, dev_data)
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, train_data, dev_data)
