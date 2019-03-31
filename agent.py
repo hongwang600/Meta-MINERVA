@@ -206,8 +206,12 @@ class Agent(nn.Module):
     def update(self, rewards, record_action_probs, record_probs):
         # discounted rewards
 
-        discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
-        discounted_rewards[:,-1] = rewards
+        #discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
+        #discounted_rewards[:,-1] = rewards
+        #print(rewards)
+        discounted_rewards = rewards.transpose()
+        #print(discounted_rewards.shape)
+        #print(self.path_length)
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
         final_reward = discounted_rewards - self.baseline

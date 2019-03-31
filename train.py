@@ -65,9 +65,9 @@ def train_one_episode(agent, episode):
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
 
-    rewards = episode.get_reward()
+    rewards = episode.get_acc_reward()
     batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs)
-    success_rate = np.sum(rewards) / batch_size
+    success_rate = np.sum(rewards[-1]) / batch_size
     return batch_loss, avg_reward, success_rate
 
 def train_on_dataset(train_data, dev_data, writer, args):

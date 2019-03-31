@@ -258,6 +258,8 @@ class Episode(object):
         self.state['next_relations'] = next_actions[:, :, 1]
         self.state['next_entities'] = next_actions[:, :, 0]
         self.state['current_entities'] = self.current_entities
+        #self.past_entities = [self.current_entities]
+        self.past_entities = []
 
     def get_all_answers(self):
         return self.all_answers
@@ -275,13 +277,32 @@ class Episode(object):
         return self.query_relation
 
     def get_reward(self):
-        reward = (self.current_entities == self.end_entities)
+        for entity in [self.current_entities]:
+            reward = (entity == self.end_entities)
 
-        # set the True and False values to the values of positive and negative rewards.
-        condlist = [reward == True, reward == False]
-        choicelist = [self.positive_reward, self.negative_reward]
-        reward = np.select(condlist, choicelist)  # [B,]
+            # set the True and False values to the values of positive and negative rewards.
+            condlist = [reward == True, reward == False]
+            choicelist = [self.positive_reward, self.negative_reward]
+            reward = np.select(condlist, choicelist)  # [B,]
         return reward
+
+    def get_acc_reward(self):
+        acc_reward = []
+        for entity in self.past_entities:
+        #for entity in [self.current_entities]:
+            reward = (entity == self.end_entities)
+
+            # set the True and False values to the values of positive and negative rewards.
+            condlist = [reward == True, reward == False]
+            choicelist = [self.positive_reward, self.negative_reward]
+            reward = np.select(condlist, choicelist)  # [B,]
+            #if acc_reward is None:
+            #    acc_reward = reward
+            #else:
+            #    acc_reward += reward
+            acc_reward.append(reward)
+            #print(reward.shape)
+        return np.array(acc_reward)
 
     def __call__(self, action):
         self.current_hop += 1
@@ -294,6 +315,7 @@ class Episode(object):
         self.state['next_relations'] = next_actions[:, :, 1]
         self.state['next_entities'] = next_actions[:, :, 0]
         self.state['current_entities'] = self.current_entities
+        self.past_entities.append(self.current_entities)
         return self.state
 
 
