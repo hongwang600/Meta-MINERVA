@@ -40,7 +40,7 @@ logfile = logging.FileHandler(args['log_path'], 'w')
 logfile.setFormatter(formatter)
 logger.addHandler(logfile)
 
-def train_one_episode(agent, episode):
+def train_one_episode(agent, episode, args):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -68,11 +68,17 @@ def train_one_episode(agent, episode):
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
 
-    rewards = episode.get_acc_reward()
+    if args['new_reward']:
+        rewards = episode.get_acc_reward()
+        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args)
+        success_rate = np.sum(rewards[-1]) / batch_size
+        return batch_loss, avg_reward, success_rate
+    else:
+        rewards = episode.get_reward()
     #print(rewards.shape)
-    batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True)
-    success_rate = np.sum(rewards[-1]) / batch_size
-    return batch_loss, avg_reward, success_rate
+        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args)
+        success_rate = np.sum(rewards) / batch_size
+        return batch_loss, avg_reward, success_rate
 
 def train(args):
     data = construct_data(args)
@@ -96,10 +102,10 @@ def train(args):
     #train_env = env(args, mode='train', batcher_triples=train_data.values())
     #print('load all envs')
 
-    if os.path.exists('logs/' + args['id']):
-        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
+    if os.path.exists(args['log_dir'] + args['id']):
+        shutil.rmtree(args['log_dir'] + args['id'], ignore_errors=True)
 
-    writer = SummaryWriter('logs/' + args['id'])
+    writer = SummaryWriter(args['log_dir'] + args['id'])
 
     beta = args['beta']
 
@@ -124,7 +130,7 @@ def train(args):
         #one_step_meta_test(agent, args, writer, train_data, dev_data)
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
-            one_step_meta_test(agent, args, writer, train_data, dev_data)
+            one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
         if agent.update_steps % 100 == 0:
             agent.save(args['save_path'])
@@ -147,7 +153,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == training_step:
@@ -185,7 +191,7 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == start_step+training_step:

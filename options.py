@@ -30,7 +30,7 @@ def read_options():
     parser.add_argument("--positive_reward", default=1.0, type=float)
     parser.add_argument("--negative_reward", default=0, type=float)
     parser.add_argument("--gamma", default=1, type=float)
-    parser.add_argument("--log_dir", default="./logs/", type=str)
+    parser.add_argument("--log_dir", default="./ablation_logs/", type=str)
     # parser.add_argument("--log_file_name", default="reward.txt", type=str)
     parser.add_argument("--output_file", default="", type=str)
     parser.add_argument("--num_rollouts", default=20, type=int)
@@ -49,6 +49,8 @@ def read_options():
     parser.add_argument("--model_load_dir", default="", type=str)
     parser.add_argument("--load_model", action='store_true')
     parser.add_argument("--test", action='store_true')
+    parser.add_argument("--extra_rollout", action='store_true')
+    parser.add_argument("--new_reward", action='store_true')
 
     parser.add_argument("--id", default='vanilla', type=str)
 

@@ -338,6 +338,7 @@ class env(object):
         self.num_meta_tasks = params['num_meta_tasks']
         input_dir = params['data_input_dir']
         self.dev_batcher = []
+        self.extra_rollout = params['extra_rollout']
         if mode == 'train':
             self.batcher = []
             if dev_triple is None:
@@ -401,7 +402,10 @@ class env(object):
                         ret_episodes.append(Episode(self.grapher, data, params))
                     else:
                         dev_data = next(dev_batch_generaters[i])
-                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
+                        if self.extra_rollout:
+                            ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
+                        else:
+                            ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params)])
                 yield ret_episodes
         else:
             for data in self.batcher.yield_next_batch_test():
