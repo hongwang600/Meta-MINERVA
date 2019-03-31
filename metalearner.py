@@ -26,21 +26,21 @@ def compute_new_params(agent, episodes, args):
 def compute_a_task_grad(agent, task_episode, args, i):
     cuda_id = i%4
     #cuda_id = 0
-    new_agent = Agent(args, cuda_id)
-    new_agent.load_state_dict(agent.state_dict())
-    new_agent.cuda(cuda_id)
+    #new_agent = Agent(args, cuda_id)
+    #new_agent.load_state_dict(agent.state_dict())
+    #new_agent.cuda(cuda_id)
     #print('before loss')
     #print(cuda_id, 'pass')
-    this_task_loss=task_loss(new_agent, task_episode[0], args, cuda_id)
-    new_params = new_agent.update_params(this_task_loss,
+    this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
+    new_params = agent.update_params(this_task_loss,
                                          args['alpha1'])
     #del agent
-    del this_task_loss
-    del new_agent
+    #del this_task_loss
+    #del new_agent
     new_agent = Agent(args, cuda_id)
     new_agent.cuda(cuda_id)
     new_agent.load_state_dict(new_params)
-    new_loss = task_loss(new_agent, task_episode[0], args, cuda_id)
+    new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
     this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
     this_task_loss = new_loss.item()
     #del new_agent
@@ -65,11 +65,11 @@ def compute_grads(agent, episodes, args):
     task_losses = []
     chunk_size = 5
     num_chunks = math.ceil(len(episodes) / chunk_size)
-    results = Parallel(n_jobs=4, backend="threading")(delayed(compute_tasks_grad)(agent, episodes[chunk_id*chunk_size:(chunk_id+1)*chunk_size], args, chunk_id)
-                                 for chunk_id in range(num_chunks))
-    #results = [compute_a_task_grad(agent, _, args, 0) for _ in episodes]
-    for chunk_result in results:
-    #for chunk_result in [results]:
+    #results = Parallel(n_jobs=4, backend="threading")(delayed(compute_tasks_grad)(agent, episodes[chunk_id*chunk_size:(chunk_id+1)*chunk_size], args, chunk_id)
+    #                             for chunk_id in range(num_chunks))
+    results = [compute_a_task_grad(agent, _, args, 0) for _ in episodes]
+    #for chunk_result in results:
+    for chunk_result in [results]:
         for task_result in chunk_result:
             task_grads.append(task_result[0])
             task_losses.append(task_result[1])

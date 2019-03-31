@@ -67,9 +67,9 @@ def train_one_episode(agent, episode):
         pre_rels = chosen_relations
     state = episode(action_flat.cpu().numpy())
 
-    rewards = episode.get_reward()
+    rewards = episode.get_acc_reward()
     batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True)
-    success_rate = np.sum(rewards) / batch_size
+    success_rate = np.sum(rewards[-1]) / batch_size
     return batch_loss, avg_reward, success_rate
 
 def train(args):
@@ -121,6 +121,9 @@ def train(args):
 
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
+
+        if agent.update_steps % 100 == 0:
+            agent.save(args['save_path'])
 
         if agent.update_steps > args['total_iterations']:
             agent.save(args['save_path'])

@@ -233,9 +233,11 @@ class RelationEntityGrapher:
 
 class Episode(object):
 
-    def __init__(self, graph, data, params):
+    def __init__(self, graph, data, params, extra_rollout=False):
         self.grapher = graph
         self.batch_size, self.path_len, num_rollouts, test_rollouts, positive_reward, negative_reward, mode, batcher = params
+        if extra_rollout:
+            num_rollouts *= 5
         self.mode = mode
         if self.mode == 'train':
             self.num_rollouts = num_rollouts
@@ -264,6 +266,7 @@ class Episode(object):
         self.state['next_relations'] = next_actions[:, :, 1]
         self.state['next_entities'] = next_actions[:, :, 0]
         self.state['current_entities'] = self.current_entities
+        self.past_entities = []
 
     def get_all_answers(self):
         return self.all_answers
@@ -289,6 +292,24 @@ class Episode(object):
         reward = np.select(condlist, choicelist)  # [B,]
         return reward
 
+    def get_acc_reward(self):
+        acc_reward = []
+        for entity in self.past_entities:
+            #for entity in [self.current_entities]:
+            reward = (entity == self.end_entities)
+
+            # set the True and False values to the values of positive and negative rewards.
+            condlist = [reward == True, reward == False]
+            choicelist = [self.positive_reward, self.negative_reward]
+            reward = np.select(condlist, choicelist)  # [B,]
+            #if acc_reward is None:
+            #    acc_reward = reward
+            #else:
+            #    acc_reward += reward
+            acc_reward.append(reward)
+            #print(reward.shape)
+        return np.array(acc_reward)
+
     def __call__(self, action):
         self.current_hop += 1
         self.current_entities = self.state['next_entities'][np.arange(self.no_examples*self.num_rollouts), action]
@@ -300,6 +321,7 @@ class Episode(object):
         self.state['next_relations'] = next_actions[:, :, 1]
         self.state['next_entities'] = next_actions[:, :, 0]
         self.state['current_entities'] = self.current_entities
+        self.past_entities.append(self.current_entities)
         return self.state
 
 
@@ -379,7 +401,7 @@ class env(object):
                         ret_episodes.append(Episode(self.grapher, data, params))
                     else:
                         dev_data = next(dev_batch_generaters[i])
-                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params)])
+                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
                 yield ret_episodes
         else:
             for data in self.batcher.yield_next_batch_test():
