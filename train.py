@@ -121,6 +121,7 @@ def train(args):
 
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
+            one_step_meta_test(agent, args, writer, train_data, dev_data)
 
         if agent.update_steps % 100 == 0:
             agent.save(args['save_path'])
@@ -166,6 +167,50 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
         writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
         writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
     writer.close()
+
+def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
+    agent = Agent(args)
+    agent.cuda()
+    agent.load_state_dict(ori_agent.state_dict())
+    #print(agent.update_steps)
+    start_step = agent.update_steps
+    #agent.update_steps = 0
+    #print(len(few_shot_data), len(test_data))
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
+    test_env = env(args, mode='dev', batcher_triples=test_data)
+    test_scores = []
+    test_scores.append(test(agent, args, None, test_env))
+    for episode in train_env.get_episodes():
+        episode = episode[0]
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        #if agent.update_steps % args['eval_every'] == 0:
+        test_scores.append(test(agent, args, None, test_env))
+        if agent.update_steps == start_step+training_step:
+            break
+    agent.update_steps=start_step
+    return np.array(test_scores)
+
+def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
+    num_meta_step = args['meta_step']
+    task_results = np.zeros([2, 6])
+    task_names = list(few_shot_data.keys())
+    random.shuffle(task_names)
+    for task in task_names[:10]:
+        few_shot_train = few_shot_data[task][:200]
+        few_shot_dev = test_data[task][:200]
+        random.shuffle(few_shot_train)
+        random.shuffle(few_shot_dev)
+        task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
+                few_shot_dev, 1)
+    task_results /= len(task_names[:10])
+    pre_str = 'meta_one_step_'
+    for i in range(len(task_results)):
+        writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits3', task_results[i][1], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits5', task_results[i][2], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits10', task_results[i][3], agent.update_steps+i)
+        writer.add_scalar(pre_str+'Hits20', task_results[i][4], agent.update_steps+i)
+        writer.add_scalar(pre_str+'AUC', task_results[i][5], agent.update_steps+i)
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 
