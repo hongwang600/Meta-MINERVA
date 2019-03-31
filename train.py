@@ -125,6 +125,7 @@ def train(args):
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, train_data, dev_data)
+            one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data, True)
 
         if agent.update_steps % 100 == 0:
             agent.save(args['save_path'])
@@ -201,7 +202,7 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     agent.update_steps=start_step
     return np.array(test_scores)
 
-def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
+def one_step_meta_test(agent, args, writer, few_shot_data, test_data, is_dev=False):
     num_meta_step = args['meta_step']
     task_results = np.zeros([2, 6])
     task_names = list(few_shot_data.keys())
@@ -214,7 +215,10 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
                 few_shot_dev, 1)
     task_results /= len(task_names[:10])
-    pre_str = 'meta_one_step_'
+    if is_dev:
+        pre_str = 'dev_meta_one_step_'
+    else:
+        pre_str = 'train_meta_one_step_'
     for i in range(len(task_results)):
         writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
         writer.add_scalar(pre_str+'Hits3', task_results[i][1], agent.update_steps+i)
