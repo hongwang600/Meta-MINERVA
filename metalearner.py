@@ -100,7 +100,7 @@ def task_loss(agent, episode, args, cuda_id=0):
 
         pre_states = states
         pre_rels = chosen_relations
-    state = episode(action_flat.cpu().numpy())
+        state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_reward()
     loss = agent.get_loss(rewards, record_action_probs, record_probs)

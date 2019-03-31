@@ -65,7 +65,7 @@ def train_one_episode(agent, episode):
 
         pre_states = states
         pre_rels = chosen_relations
-    state = episode(action_flat.cpu().numpy())
+        state = episode(action_flat.cpu().numpy())
 
     rewards = episode.get_reward()
     batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True)
