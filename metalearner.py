@@ -102,7 +102,7 @@ def task_loss(agent, episode, args, cuda_id=0):
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
 
-    rewards = episode.get_reward()
+    rewards = episode.get_acc_reward()
     loss = agent.get_loss(rewards, record_action_probs, record_probs)
     #success_rate = np.sum(rewards) / batch_size
     #return batch_loss, avg_reward, success_rate
