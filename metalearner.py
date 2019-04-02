@@ -25,6 +25,7 @@ def compute_new_params(agent, episodes, args):
 
 def compute_a_task_grad(agent, task_episode, args, i):
     cuda_id = i%2
+    origin_state = agent.state_dict()
     #cuda_id = 0
     #new_agent = Agent(args, cuda_id)
     #new_agent.load_state_dict(agent.state_dict())
@@ -37,8 +38,9 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #del agent
     #del this_task_loss
     #del new_agent
-    new_agent = Agent(args, cuda_id)
-    new_agent.cuda(cuda_id)
+    #new_agent = Agent(args, cuda_id)
+    #new_agent.cuda(cuda_id)
+    new_agent = agent
     new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
     this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
@@ -46,8 +48,9 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #del new_agent
     #print(task_grads[-1])
     del new_loss
-    del new_agent
+    #del new_agent
     del new_params
+    agent.load_state_dict(origin_state)
     torch.cuda.empty_cache()
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:
