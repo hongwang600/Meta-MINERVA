@@ -25,7 +25,7 @@ class RelationEntityBatcher():
         self.relation_vocab = relation_vocab
         self.mode = mode
         self.create_triple_store(self.input_file, batcher_triples)
-        self.data_size = max(1000, len(batcher_triples))
+        self.data_size = min(1000, len(batcher_triples))
         # print("batcher loaded")
 
 

@@ -82,8 +82,8 @@ def train(args):
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
     concated_train_data = concat_data(train_data)
     concated_dev_data = concat_data(dev_data)
-    #random.shuffle(concated_train_data)
-    #random.shuffle(concated_dev_data)
+    random.shuffle(concated_train_data)
+    random.shuffle(concated_dev_data)
     #print(concated_dev_data)
     logger.info('start training')
 
@@ -92,7 +92,7 @@ def train(args):
     dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
 
     #print(len(train_data.values()))
-    train_env = env(args, mode='train', batcher_triples=train_data, dev_triple = dev_data)
+    train_env = env(args, mode='train', batcher_triples={'all_tasks':concated_train_data}, dev_triple = {'all_tasks':concated_dev_data})
     #train_env = env(args, mode='train', batcher_triples=train_data.values())
     #print('load all envs')
 
