@@ -135,9 +135,9 @@ def train(args):
     task_results = np.zeros(6)
     count = 0
     to_train_data = concated_meta_train_data + concated_train_data
-    #to_dev_data = concated_meta_dev_data + concated_dev_data
-    to_dev_data = to_train_data[:2000]
-    to_train_data = to_train_data[:-2000]
+    to_dev_data = concated_meta_dev_data + concated_dev_data
+    #to_dev_data = to_train_data[:2000]
+    #to_train_data = to_train_data[:-2000]
     #to_train_data = concated_meta_train_data
     #to_dev_data = concated_meta_dev_data
     #to_train_data = meta_train_data

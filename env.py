@@ -156,7 +156,7 @@ class RelationEntityGrapher:
     '''
     for every entity, created an action tensor, which stores all available actions (out relation, entity)
     '''
-    def __init__(self, triple_store, relation_vocab, entity_vocab, max_num_actions):
+    def __init__(self, triple_store, relation_vocab, entity_vocab, max_num_actions, extra_graph_file):
 
         self.ePAD = entity_vocab['PAD']
         self.rPAD = relation_vocab['PAD']
@@ -171,6 +171,7 @@ class RelationEntityGrapher:
 
         self.rev_relation_vocab = dict([(v, k) for k, v in relation_vocab.items()])
         self.rev_entity_vocab = dict([(v, k) for k, v in entity_vocab.items()])
+        self.extra_graph_file = extra_graph_file
         self.create_graph()
         # print("KG constructed")
 
@@ -185,6 +186,18 @@ class RelationEntityGrapher:
                 r = self.relation_vocab[line[1]]
                 e2 = self.entity_vocab[line[2]]
                 self.store[e1].append((r, e2)) # store record the out links for each entity
+        with open(self.extra_graph_file) as triple_file_raw:
+            triple_file = csv.reader(triple_file_raw, delimiter='\t')
+            counter = 0
+            for line in triple_file:
+                if line[0] in self.entity_vocab and line[2] in self.entity_vocab and line[1] in self.relation_vocab:
+                    e1 = self.entity_vocab[line[0]]
+                    r = self.relation_vocab[line[1]]
+                    e2 = self.entity_vocab[line[2]]
+                    self.store[e1].append((r, e2)) # store record the out links for each entity
+                else:
+                    counter += 1
+            print(counter)
 
         for e1 in self.store:
             num_actions = 1
@@ -360,7 +373,8 @@ class env(object):
         self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'graph.txt',
                                              max_num_actions=params['max_num_actions'],
                                              entity_vocab=params['entity_vocab'],
-                                             relation_vocab=params['relation_vocab'])
+                                             relation_vocab=params['relation_vocab'],
+                                             extra_graph_file=params['data_input_dir']+'/'+'dev.txt')
 
     def get_episodes(self):
         params = self.batch_size, self.path_len, self.num_rollouts, self.test_rollouts, self.positive_reward, self.negative_reward, self.mode, self.batcher
