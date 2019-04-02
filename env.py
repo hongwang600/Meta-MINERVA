@@ -43,6 +43,7 @@ class RelationEntityBatcher():
             #    csv_file = csv.reader(raw_input_file, delimiter = '\t' )
             #    for line in csv_file:
             for line in batcher_triples:
+                if line[0] in self.entity_vocab and line[1] in self.relation_vocab and line[2] in self.entity_vocab:
                     e1 = self.entity_vocab[line[0]]
                     r = self.relation_vocab[line[1]]
                     e2 = self.entity_vocab[line[2]]
