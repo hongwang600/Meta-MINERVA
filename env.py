@@ -403,7 +403,7 @@ class env(object):
                         ret_episodes.append(Episode(self.grapher, data, params))
                     else:
                         dev_data = next(dev_batch_generaters[i])
-                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
+                        ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, data, params)])
                 yield ret_episodes
         else:
             for data in self.batcher.yield_next_batch_test():

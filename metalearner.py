@@ -36,7 +36,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     new_params = agent.update_params(this_task_loss,
                                          args['alpha1'])
     #del agent
-    #del this_task_loss
+    del this_task_loss
     #del new_agent
     #new_agent = Agent(args, cuda_id)
     #new_agent.cuda(cuda_id)
