@@ -12,5 +12,5 @@ if __name__ == '__main__':
     agent.load(args['save_path'])
     data = construct_data(args)
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
-    writer = SummaryWriter('logs/' + args['id'])
+    writer = SummaryWriter(args['log_dir'] + args['id'])
     meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)

@@ -401,7 +401,8 @@ class env(object):
                     if len(dev_batch_generaters) == 0:
                         ret_episodes.append(Episode(self.grapher, data, params))
                     else:
-                        dev_data = next(dev_batch_generaters[i])
+                        #dev_data = next(dev_batch_generaters[i])
+                        dev_data = next(batch_generaters[i])
                         if self.extra_rollout:
                             ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
                         else:
