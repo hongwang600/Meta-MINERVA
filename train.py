@@ -175,12 +175,15 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):
-        writer.add_scalar(pre_str+'Hits1', task_results[i][0], i)
-        writer.add_scalar(pre_str+'Hits3', task_results[i][1], i)
-        writer.add_scalar(pre_str+'Hits5', task_results[i][2], i)
-        writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
-        writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
-        writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
+        to_shown_idx = i
+        if i > 10:
+            to_shown_idx = (i-10+1)*10
+        writer.add_scalar(pre_str+'Hits1', task_results[i][0], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits3', task_results[i][1], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits5', task_results[i][2], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits10', task_results[i][3], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits20', task_results[i][4], to_shown_idx)
+        writer.add_scalar(pre_str+'AUC', task_results[i][5], to_shown_idx)
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
