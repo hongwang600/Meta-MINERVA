@@ -10,7 +10,7 @@ def read_options():
     parser.add_argument("--train_file", default="train.json", type=str)
     parser.add_argument("--dev_file", default="dev.json", type=str)
     parser.add_argument("--meta_dev_file", default="meta_dev.json", type=str)
-    parser.add_argument("--meta_step", default=10, type=int)
+    parser.add_argument("--meta_step", default=50, type=int)
     parser.add_argument("--few_shot_dev_file", default="few_shot_dev.json", type=str)
     parser.add_argument("--few_shot_size", default=10, type=int)
     parser.add_argument("--num_meta_tasks", default=10, type=int)

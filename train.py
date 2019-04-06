@@ -155,17 +155,23 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
         episode = episode[0]
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
-        test_scores.append(test(agent, args, None, test_env))
+        if agent.update_steps < 10 or agent.update_steps%10==0:
+            test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == training_step:
             break
     return np.array(test_scores)
 
 def meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
-    task_results = np.zeros([num_meta_step+1, 6])
+    #task_results = np.zeros([num_meta_step+1, 6])
+    task_results = None
     for task in few_shot_data:
-        task_results += single_task_meta_test(agent, args, few_shot_data[task],
+        new_results = single_task_meta_test(agent, args, few_shot_data[task],
                                               test_data[task], num_meta_step)
+        if task_results is None:
+            task_results = new_results
+        else:
+            task_results += new_results
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):

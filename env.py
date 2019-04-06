@@ -359,10 +359,11 @@ class env(object):
                                                                   batcher_triples=triples
                                                                 ))
                         self.dev_batcher.append(RelationEntityBatcher(input_dir=input_dir,
-                                                                  batch_size=params['batch_size'],
+                                                                  batch_size=params['batch_size']*4,
                                                                   entity_vocab=params['entity_vocab'],
                                                                   relation_vocab=params['relation_vocab'],
-                                                                  batcher_triples=dev_triple[name]
+                                                                  batcher_triples=triples
+                                                                  #batcher_triples=dev_triple[name]
                                                                 ))
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
@@ -401,8 +402,8 @@ class env(object):
                     if len(dev_batch_generaters) == 0:
                         ret_episodes.append(Episode(self.grapher, data, params))
                     else:
-                        #dev_data = next(dev_batch_generaters[i])
-                        dev_data = next(batch_generaters[i])
+                        dev_data = next(dev_batch_generaters[i])
+                        #dev_data = next(batch_generaters[i])
                         if self.extra_rollout:
                             ret_episodes.append([Episode(self.grapher, data, params),Episode(self.grapher, dev_data, params, True)])
                         else:
