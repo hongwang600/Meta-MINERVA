@@ -213,11 +213,11 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     task_results = np.zeros([2, 6])
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
-    for task in task_names[:10]:
+    for task in task_names:
         few_shot_train = few_shot_data[task][:200]
         few_shot_dev = test_data[task][:200]
-        random.shuffle(few_shot_train)
-        random.shuffle(few_shot_dev)
+        #random.shuffle(few_shot_train)
+        #random.shuffle(few_shot_dev)
         task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
                 few_shot_dev, 1)
     task_results /= len(task_names[:10])
