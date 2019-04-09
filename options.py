@@ -39,7 +39,7 @@ def read_options():
 
     parser.add_argument("--Lambda", default=0.0, type=float)
     parser.add_argument("--pool", default="max", type=str)
-    parser.add_argument("--eval_every", default=10, type=int)
+    parser.add_argument("--eval_every", default=50, type=int)
     # parser.add_argument("--use_entity_embeddings", aciton='store_true')
     parser.add_argument("--train_entity_embeddings", action='store_true')
     parser.add_argument("--train_relation_embeddings", action='store_true')
