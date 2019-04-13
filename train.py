@@ -129,11 +129,10 @@ def train(args):
 
         #one_step_meta_test(agent, args, writer, train_data, dev_data)
         if agent.update_steps % args['eval_every'] == 0:
+            agent.save(args['save_path'+'_'+str(agent.update_steps)])
             test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
-        if agent.update_steps % 100 == 0:
-            agent.save(args['save_path'])
 
         if agent.update_steps > args['total_iterations']:
             agent.save(args['save_path'])
