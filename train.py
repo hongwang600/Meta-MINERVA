@@ -109,10 +109,10 @@ def train(args):
 
         if agent.update_steps % args['eval_every'] == 0:
             test(agent, args, writer, dev_env)
-            agent.save(args['save_path'])
+            #agent.save(args['save_path'])
 
         episode_count += 1
-        if episode_count%1000==0:
+        if episode_count % args['eval_every'] ==0:
             agent.save(args['save_path']+'_'+str(episode_count))
 
         if agent.update_steps > args['total_iterations']:
