@@ -213,7 +213,7 @@ class Agent(nn.Module):
 
     def decay_lr(self):
         for param_group in self.optim.param_groups:
-            param_group['lr'] = max(1e-3, param_group['lr']*0.01)
+            param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
     def update(self, rewards, record_action_probs, record_probs, decay_lr=False, args=None):
         # discounted rewards
