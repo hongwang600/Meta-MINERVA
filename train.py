@@ -219,7 +219,7 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         #random.shuffle(few_shot_dev)
         task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
                 few_shot_dev, 1)
-    task_results /= len(task_names[:10])
+    task_results /= len(task_names)
     pre_str = 'meta_one_step_'
     for i in range(len(task_results)):
         writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
