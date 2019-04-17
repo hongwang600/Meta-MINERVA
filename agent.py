@@ -223,7 +223,6 @@ class Agent(nn.Module):
         else:
             discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
             discounted_rewards[:,-1] = rewards
-        record_actions = torch.stack(record_actions)
         #discounted_rewards = rewards.transpose()
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
@@ -279,6 +278,12 @@ class Agent(nn.Module):
         else:
             discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
             discounted_rewards[:,-1] = rewards
+
+        record_actions = torch.stack(record_actions, 0)
+        print(rewards.size, record_actions.size())
+        record_action_embed = self.relation_emb(record_actions)
+        output, (h, c) = self.path_encoder(record_action_embed)
+
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
         final_reward = discounted_rewards - self.baseline

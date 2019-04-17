@@ -87,7 +87,7 @@ def task_loss(agent, episode, args, cuda_id=0):
 
     record_action_probs = []
     record_probs = []
-    record_actinos = []
+    record_actions = []
     for step in range(args['path_length']):
         next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda(cuda_id)
         next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda(cuda_id)
