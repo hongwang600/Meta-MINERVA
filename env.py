@@ -359,7 +359,7 @@ class env(object):
                                                                   batcher_triples=triples
                                                                 ))
                         self.dev_batcher.append(RelationEntityBatcher(input_dir=input_dir,
-                                                                  batch_size=params['batch_size']*4,
+                                                                  batch_size=params['batch_size'],
                                                                   entity_vocab=params['entity_vocab'],
                                                                   relation_vocab=params['relation_vocab'],
                                                                   batcher_triples=triples
