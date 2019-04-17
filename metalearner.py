@@ -87,6 +87,7 @@ def task_loss(agent, episode, args, cuda_id=0):
 
     record_action_probs = []
     record_probs = []
+    record_actinos = []
     for step in range(args['path_length']):
         next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda(cuda_id)
         next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda(cuda_id)
@@ -104,13 +105,14 @@ def task_loss(agent, episode, args, cuda_id=0):
         pre_states = states
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
+        record_actions.append(action_flat)
 
     if args['new_reward']:
         rewards = episode.get_acc_reward()
-        loss = agent.get_loss(rewards, record_action_probs, record_probs, args)
+        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_actions=record_actions)
     else:
         rewards = episode.get_reward()
-        loss = agent.get_loss(rewards, record_action_probs, record_probs, args)
+        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_actions=record_actions)
     #success_rate = np.sum(rewards) / batch_size
     #return batch_loss, avg_reward, success_rate
     return loss

@@ -49,6 +49,7 @@ def train_one_episode(agent, episode, args):
 
     record_action_probs = []
     record_probs = []
+    record_arctions = []
     for step in range(args['path_length']):
         #print('one_step', step)
         next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
@@ -67,16 +68,17 @@ def train_one_episode(agent, episode, args):
         pre_states = states
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
+        record_actions.append(action_flat)
 
     if args['new_reward']:
         rewards = episode.get_acc_reward()
-        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args)
+        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args, record_actions = record_actions)
         success_rate = np.sum(rewards[-1]) / batch_size
         return batch_loss, avg_reward, success_rate
     else:
         rewards = episode.get_reward()
     #print(rewards.shape)
-        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args)
+        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args, record_actions = record_actions)
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
 

@@ -132,6 +132,7 @@ class Agent(nn.Module):
             else:
                 self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda(self.cuda_id))
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
+        self.path_encoder = nn.LSTM(self.embed_size, self.embed_size)
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
@@ -215,13 +216,14 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
-    def update(self, rewards, record_action_probs, record_probs, decay_lr=False, args=None):
+    def update(self, rewards, record_action_probs, record_probs, record_actions, decay_lr=False, args=None):
         # discounted rewards
         if args['new_reward']:
             discounted_rewards = rewards.transpose()
         else:
             discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
             discounted_rewards[:,-1] = rewards
+        record_actions = torch.stack(record_actions)
         #discounted_rewards = rewards.transpose()
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
@@ -269,7 +271,7 @@ class Agent(nn.Module):
     def load(self, path):
         self.load_state_dict(torch.load(path))
 
-    def get_loss(self, rewards, record_action_probs, record_probs, args):
+    def get_loss(self, rewards, record_action_probs, record_probs, args, record_actions):
         # discounted rewards
 
         if args['new_reward']:
