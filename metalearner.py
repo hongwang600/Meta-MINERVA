@@ -43,7 +43,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     new_agent = agent
     new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
-    this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
+    this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters(), allow_unused=True)
     this_task_loss = new_loss.item()
     #del new_agent
     #print(task_grads[-1])
@@ -109,10 +109,10 @@ def task_loss(agent, episode, args, cuda_id=0):
 
     if args['new_reward']:
         rewards = episode.get_acc_reward()
-        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_actions=record_actions)
+        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_path_rel=[record_actions, query_rels])
     else:
         rewards = episode.get_reward()
-        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_actions=record_actions)
+        loss = agent.get_loss(rewards, record_action_probs, record_probs, args, record_path_rel=[record_actions, query_rels])
     #success_rate = np.sum(rewards) / batch_size
     #return batch_loss, avg_reward, success_rate
     return loss
@@ -142,9 +142,10 @@ def meta_step(agent, episodes, optim, args):
             #print(param.data)
             #param.data -= args['alpha2']*grad
             if param.grad is not None:
-                param.grad += grad.cuda(0)
+                if grad is not None:
+                    param.grad += grad
             else:
-                param.grad = grad.cuda(0)
+                param.grad = grad
         #print('new param')
         #for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(param.data)

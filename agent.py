@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from data import get_id_relation, tokenize_relation, build_vocab
 from collections import OrderedDict
+from attention import SimpleEncoder
+import math
 
 #from yellowfin import YFOptimizer
 class Packed(nn.Module):
@@ -101,6 +103,8 @@ class Agent(nn.Module):
 
         """
         super(Agent, self).__init__()
+        self.record_path = [[],[]]
+        self.use_path_encoder = False
         self.cuda_id = cuda_id
         for k, v in arg.items(): setattr(self, k, v)
         self.batch_size *= self.num_rollouts
@@ -132,7 +136,8 @@ class Agent(nn.Module):
             else:
                 self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda(self.cuda_id))
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
-        self.path_encoder = nn.LSTM(self.embed_size, self.embed_size)
+        self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
+        #self.path_encoder = SimpleEncoder(self.embed_size, 5, 3)
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
@@ -216,13 +221,35 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
-    def update(self, rewards, record_action_probs, record_probs, record_actions, decay_lr=False, args=None):
+    def update(self, rewards, record_action_probs, record_probs, record_path_rel, decay_lr=False, args=None):
         # discounted rewards
         if args['new_reward']:
             discounted_rewards = rewards.transpose()
         else:
             discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
             discounted_rewards[:,-1] = rewards
+
+        record_actions, query_rels = record_path_rel
+        record_actions = torch.stack(record_actions, 1)
+        embed_loss = None
+        reward_t = torch.from_numpy(rewards)
+        sel_path_idx = reward_t == 1
+        #print(reward_t, sel_path_idx)
+        record_actions = record_actions[sel_path_idx]
+        query_rels = query_rels[sel_path_idx]
+        self.record_path[0].append(record_actions)
+        self.record_path[1].append(query_rels)
+        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+            record_action_embed = self.relation_emb(record_actions)
+            query_relation_embed = self.relation_emb(query_rels)
+            output, (h, c) = self.path_encoder(record_action_embed)
+            #h = self.path_encoder(record_action_embed)
+            dis = nn.PairwiseDistance(p=2)
+            h = h.view(query_relation_embed.size())
+            #print(h.size())
+            #print(query_relation_embed.size())
+            embed_loss = torch.mean(dis(h, query_relation_embed))
+
         #discounted_rewards = rewards.transpose()
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
@@ -249,6 +276,9 @@ class Agent(nn.Module):
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
         self.loss = self.entropy_loss + self.rl_loss
+        if embed_loss is not None:
+            self.loss += 0.1*embed_loss
+            print(embed_loss.data)
         self.optim.zero_grad()
         self.loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
@@ -270,7 +300,8 @@ class Agent(nn.Module):
     def load(self, path):
         self.load_state_dict(torch.load(path))
 
-    def get_loss(self, rewards, record_action_probs, record_probs, args, record_actions):
+    def get_loss(self, rewards, record_action_probs, record_probs, args,
+            record_path_rel):
         # discounted rewards
 
         if args['new_reward']:
@@ -279,10 +310,27 @@ class Agent(nn.Module):
             discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
             discounted_rewards[:,-1] = rewards
 
-        record_actions = torch.stack(record_actions, 0)
-        print(rewards.size, record_actions.size())
-        record_action_embed = self.relation_emb(record_actions)
-        output, (h, c) = self.path_encoder(record_action_embed)
+        record_actions, query_rels = record_path_rel
+        record_actions = torch.stack(record_actions, 1)
+        embed_loss = None
+        reward_t = torch.from_numpy(rewards)
+        sel_path_idx = reward_t == 1
+        #print(reward_t, sel_path_idx)
+        #print(query_rels.size())
+        record_actions = record_actions[sel_path_idx]
+        query_rels = query_rels[sel_path_idx]
+        self.record_path[0].append(record_actions)
+        self.record_path[1].append(query_rels)
+        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+            record_action_embed = self.relation_emb(record_actions)
+            query_relation_embed = self.relation_emb(query_rels)
+            output, (h, c) = self.path_encoder(record_action_embed)
+            #h = self.path_encoder(record_action_embed)
+            dis = nn.PairwiseDistance(p=2)
+            h = h.view(query_relation_embed.size())
+            #print(h.size())
+            #print(query_relation_embed.size())
+            embed_loss = torch.mean(dis(h, query_relation_embed))
 
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
@@ -309,6 +357,10 @@ class Agent(nn.Module):
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
         self.loss = self.entropy_loss + self.rl_loss
+        if embed_loss is not None:
+            self.loss += 0.1*embed_loss
+            print(embed_loss.data)
+        #print(self.loss, embed_loss)
         return self.loss
         #return torch.autograd.grad(self.loss, self.parameters)
         #self.optim.zero_grad()
@@ -333,7 +385,7 @@ class Agent(nn.Module):
         self.optim.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
-        updated_params = OrderedDict()
+        updated_params = self.state_dict()
         #for (name, param), grad in zip(self.named_parameters(), grads):
         for (name, param) in self.named_parameters():
             updated_params[name] = param.clone()
@@ -341,3 +393,24 @@ class Agent(nn.Module):
                 updated_params[name] -= step_size * param.grad
 
         return updated_params
+    
+    def train_path_reasoner(self):
+        record_actions = torch.cat(self.record_path[0], 0)
+        query_rels = torch.cat(self.record_path[1], 0)
+        optim = torch.optim.Adam(self.path_encoder.parameters(), lr=self.path_lr)
+        for epoch in range(self.path_epoch):
+            num_batches = math.ceil(len(record_actions)/self.path_batch_size)
+            batch_size = self.path_batch_size
+            for i in range(num_batches):
+                batch_x = record_actions[i*batch_size:(i+1)*batch_size]
+                batch_y = query_rels[i*batch_size:(i+1)*batch_size]
+                x_embed = self.relation_emb(batch_x)
+                y_embed = self.relation_emb(batch_y)
+                output, (h, c) = self.path_encoder(x_embed)
+                path_enc = h.view(y_embed.size())
+                dis = nn.PairwiseDistance(p=2)
+                embed_loss = torch.mean(dis(path_enc, y_embed))
+                print(embed_loss)
+                optim.zero_grad()
+                embed_loss.backward()
+                optim.step()

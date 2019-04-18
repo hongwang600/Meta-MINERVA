@@ -368,7 +368,7 @@ class env(object):
         else:
             self.batcher = RelationEntityBatcher(input_dir=input_dir,
                                                  mode =mode,
-                                                 batch_size=params['batch_size'],
+                                                 batch_size=min(params['batch_size']*10,128),
                                                  entity_vocab=params['entity_vocab'],
                                                  relation_vocab=params['relation_vocab'],
                                                  batcher_triples=batcher_triples
