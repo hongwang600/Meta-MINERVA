@@ -82,6 +82,40 @@ def train_one_episode(agent, episode, args):
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
 
+def update_rel_embed(agent, episode, args):
+    query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
+    batch_size = query_rels.size()[0]
+    state = episode.get_state()
+    pre_rels = Variable(torch.ones(batch_size) * args['relation_vocab']['DUMMY_START_RELATION']).long().cuda()
+    pre_states = agent.init_rnn_states(batch_size)
+
+    record_action_probs = []
+    record_probs = []
+    record_actions = []
+    for step in range(args['path_length']):
+        #print('one_step', step)
+        next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
+        next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
+        curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda()
+
+        probs, states = agent(next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents)
+        record_probs.append(probs)
+        action = torch.multinomial(probs, 1).detach()
+        action_flat = action.data.squeeze()
+        action_gather_indice = torch.arange(0, batch_size).long().cuda() * args['max_num_actions'] + action_flat
+        action_prob = probs.view(-1)[action_gather_indice]
+        record_action_probs.append(action_prob)
+        chosen_relations = next_rels.view(-1)[action_gather_indice]
+
+        pre_states = states
+        pre_rels = chosen_relations
+        state = episode(action_flat.cpu().numpy())
+        record_actions.append(action_flat)
+
+    rewards = episode.get_reward()
+    #print(rewards.shape)
+    agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels])
+
 def train(args):
     data = construct_data(args)
     id_rels = get_id_relation(args)
@@ -137,6 +171,7 @@ def train(args):
 
 
         if agent.update_steps > args['total_iterations']:
+            agent.save_record_path(args['save_path']+'_record_path')
             agent.train_path_reasoner()
             agent.save(args['save_path'])
             break
@@ -153,8 +188,12 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
+    update_embed = True
     for episode in train_env.get_episodes():
         episode = episode[0]
+        if update_embed:
+            update_embed = False
+            update_rel_embed(agent, episode, args)
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
         if agent.update_steps < 10 or agent.update_steps%10==0:

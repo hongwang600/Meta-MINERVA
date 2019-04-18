@@ -3,6 +3,8 @@ from __future__ import division
 
 import numpy as np
 import torch
+import random
+random.seed(1)
 torch.manual_seed(1)
 np.random.seed(1)
 import torch.nn as nn
@@ -114,13 +116,13 @@ class Agent(nn.Module):
         self.rPAD = self.relation_vocab['PAD']
 
         # relation embedding matrix
-        #self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
+        self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
         # nn.init.xavier_uniform(self.relation_emb.weight)
 
         self.id_rels = get_id_relation(arg)
         self.token_vocab = build_vocab(arg)
         token_embed = self.token_vocab.embedding.idx_to_vec
-        self.relation_enc = LSTM(arg, token_embed.asnumpy())
+        #self.relation_enc = LSTM(arg, token_embed.asnumpy())
         self.all_relation_tokens, self.all_relation_token_lengths =\
             self.all_tokenized_relations()
 
@@ -199,7 +201,7 @@ class Agent(nn.Module):
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(self.cuda_id), token_lengths.cuda(self.cuda_id)
 
-    def relation_emb(self, relation_ids):
+    def _relation_emb(self, relation_ids):
         #print(relation_ids.size())
         #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
         all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
@@ -221,6 +223,20 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
+    def update_path_embed(self, rewards, record_path_rel, args=None):
+        record_actions, query_rels = record_path_rel
+        record_actions = torch.stack(record_actions, 1)
+        reward_t = torch.from_numpy(rewards)
+        sel_path_idx = reward_t == 1
+        record_actions = record_actions[sel_path_idx]
+        query_rels = query_rels[sel_path_idx]
+        if torch.sum(sel_path_idx) > 0:
+            record_action_embed = self.relation_emb(record_actions)
+            query_relation_embed = self.relation_emb(query_rels)
+            output, (h, c) = self.path_encoder(record_action_embed)
+            relation_embed_t = self.relation_emb.weight
+            relation_embed_t[sel_path_idx] = h.view(query_relation_embed.size())
+
     def update(self, rewards, record_action_probs, record_probs, record_path_rel, decay_lr=False, args=None):
         # discounted rewards
         if args['new_reward']:
@@ -237,8 +253,8 @@ class Agent(nn.Module):
         #print(reward_t, sel_path_idx)
         record_actions = record_actions[sel_path_idx]
         query_rels = query_rels[sel_path_idx]
-        self.record_path[0].append(record_actions)
-        self.record_path[1].append(query_rels)
+        #self.record_path[0].append(record_actions)
+        #self.record_path[1].append(query_rels)
         if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
             record_action_embed = self.relation_emb(record_actions)
             query_relation_embed = self.relation_emb(query_rels)
@@ -296,6 +312,13 @@ class Agent(nn.Module):
 
     def save(self, path):
         torch.save(self.state_dict(), path)
+
+    def save_record_path(self, path):
+        record_actions = torch.cat(self.record_path[0], 0)
+        query_rels = torch.cat(self.record_path[1], 0)
+        torch.save(record_actions, path+'record_actions')
+        torch.save(query_rels, path+'query_rels')
+
 
     def load(self, path):
         self.load_state_dict(torch.load(path))
@@ -398,7 +421,11 @@ class Agent(nn.Module):
         record_actions = torch.cat(self.record_path[0], 0)
         query_rels = torch.cat(self.record_path[1], 0)
         optim = torch.optim.Adam(self.path_encoder.parameters(), lr=self.path_lr)
+        index = list(range(len(query_rels)))
         for epoch in range(self.path_epoch):
+            record_actions = record_actions[index]
+            query_rels = query_rels[index]
+            random.shuffle(index)
             num_batches = math.ceil(len(record_actions)/self.path_batch_size)
             batch_size = self.path_batch_size
             for i in range(num_batches):
