@@ -27,7 +27,7 @@ def read_options():
     parser.add_argument("--alpha1", default=1e-1, type=float)
     parser.add_argument("--alpha2", default=1e-3, type=float)
     parser.add_argument("--path_lr", default=1e-3, type=float)
-    parser.add_argument("--path_epoch", default=50, type=int)
+    parser.add_argument("--path_epoch", default=100, type=int)
     parser.add_argument("--path_batch_size", default=64, type=int)
     parser.add_argument("--beta", default=0.01, type=float)
     parser.add_argument("--positive_reward", default=1.0, type=float)
@@ -56,11 +56,13 @@ def read_options():
     parser.add_argument("--new_reward", action='store_true')
 
     parser.add_argument("--id", default='vanilla', type=str)
+    parser.add_argument("--path_data", default='vanilla', type=str)
 
     arg_dic = vars(parser.parse_args())
     arg_dic['log_path'] = arg_dic['log_dir'] + arg_dic['id'] + '.txt'
 
     arg_dic['save_path'] = 'models/' + arg_dic['id']
+    arg_dic['path_data_save_path'] = 'models/' + arg_dic['path_data']
 
     # read KB vocab
     arg_dic['vocab_dir'] = arg_dic['data_input_dir'] + '/vocab'
