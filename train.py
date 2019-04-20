@@ -87,10 +87,11 @@ def train(args):
     train_env = env(args, mode='train', batcher_triples=concated_train_data)
     dev_env = env(args, mode='dev', batcher_triples=concated_dev_data)
 
-    if os.path.exists('logs/' + args['id']):
-        shutil.rmtree('logs/' + args['id'], ignore_errors=True)
+    if os.path.exists(args['log_dir'] + args['id']):
+        shutil.rmtree(args['log_dir'] + args['id'], ignore_errors=True)
 
-    writer = SummaryWriter('logs/' + args['id'])
+    print(args['log_dir'])
+    writer = SummaryWriter(args['log_dir'] + args['id'])
 
     beta = args['beta']
 
@@ -165,13 +166,13 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     start_step = agent.update_steps
     #agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
+    train_env = env(args, mode='train', batcher_triples=few_shot_data)
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
-        episode = episode[0]
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
+        #episode = episode[0]
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == start_step+training_step:

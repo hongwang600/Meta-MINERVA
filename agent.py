@@ -108,13 +108,13 @@ class Agent(nn.Module):
         self.rPAD = self.relation_vocab['PAD']
 
         # relation embedding matrix
-        #self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
+        self.relation_emb = nn.Embedding(self.num_relation, self.embed_size)
         # nn.init.xavier_uniform(self.relation_emb.weight)
 
         self.id_rels = get_id_relation(arg)
         self.token_vocab = build_vocab(arg)
         token_embed = self.token_vocab.embedding.idx_to_vec
-        self.relation_enc = LSTM(arg, token_embed.asnumpy())
+        #self.relation_enc = LSTM(arg, token_embed.asnumpy())
         self.all_relation_tokens, self.all_relation_token_lengths =\
             self.all_tokenized_relations()
 
@@ -186,7 +186,7 @@ class Agent(nn.Module):
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(), token_lengths.cuda()
 
-    def relation_emb(self, relation_ids):
+    def _relation_emb(self, relation_ids):
         #print(relation_ids.size())
         #print(self.all_relation_tokens.size(), self.all_relation_token_lengths.size())
         all_relation_embeddings = self.relation_enc(self.all_relation_tokens,
