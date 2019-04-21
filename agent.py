@@ -224,6 +224,8 @@ class Agent(nn.Module):
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
     def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None):
+        if reasoner is None:
+            reasoner = self.path_encoder
         record_actions, query_rels = record_path_rel
         record_actions = torch.stack(record_actions, 1)
         #print(query_rels)
@@ -236,7 +238,7 @@ class Agent(nn.Module):
             record_action_embed = self.relation_emb(record_actions)
             query_relation_embed = self.relation_emb(query_rels)
             if is_lstm:
-                output, (h, c) = self.path_encoder(record_action_embed)
+                output, (h, c) = reasoner(record_action_embed)
             else:
                 h = reasoner(record_action_embed)
             relation_embed_t = self.relation_emb.weight
@@ -272,12 +274,12 @@ class Agent(nn.Module):
             query_relation_embed = self.relation_emb(query_rels).detach()
             #output, (h, c) = self.path_encoder(record_action_embed)
             h = self.path_encoder(record_action_embed)
-            #dis = nn.PairwiseDistance(p=2)
-            dis = nn.CosineSimilarity(dim=1)
+            dis = nn.PairwiseDistance(p=2)
+            #dis = nn.CosineSimilarity(dim=1)
             h = h.view(query_relation_embed.size())
             #print(h.size())
             #print(query_relation_embed.size())
-            embed_loss = torch.mean(1-dis(h, query_relation_embed))
+            embed_loss = torch.mean(dis(h, query_relation_embed))
 
         #discounted_rewards = rewards.transpose()
         for i in range(1, self.path_length):
@@ -366,12 +368,12 @@ class Agent(nn.Module):
             query_relation_embed = self.relation_emb(query_rels).detach()
             #output, (h, c) = self.path_encoder(record_action_embed)
             h = self.path_encoder(record_action_embed)
-            #dis = nn.PairwiseDistance(p=2)
-            dis = nn.CosineSimilarity(dim=1)
+            dis = nn.PairwiseDistance(p=2)
+            #dis = nn.CosineSimilarity(dim=1)
             h = h.view(query_relation_embed.size())
             #print(h.size())
             #print(query_relation_embed.size())
-            embed_loss = torch.mean(1-dis(h, query_relation_embed))
+            embed_loss = torch.mean(dis(h, query_relation_embed))
 
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]

@@ -83,7 +83,7 @@ def train_one_episode(agent, episode, args):
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
 
-def update_rel_embed(agent, episode, args, reasoner):
+def update_rel_embed(agent, episode, args, reasoner=None):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -174,7 +174,7 @@ def train(args):
 
         if agent.update_steps > args['total_iterations']:
             agent.save_record_path(args['save_path']+'_record_path_')
-            agent.train_path_reasoner()
+            #agent.train_path_reasoner()
             agent.save(args['save_path'])
             break
     meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
@@ -249,6 +249,8 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]
+        update_rel_embed(agent, episode, args)
+        test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
         test_scores.append(test(agent, args, None, test_env))
@@ -259,7 +261,7 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
 
 def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
-    task_results = np.zeros([2, 6])
+    task_results = np.zeros([3, 6])
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
     for task in task_names:
