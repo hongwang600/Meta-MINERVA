@@ -249,11 +249,12 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]
-        update_rel_embed(agent, episode, args)
-        test_scores.append(test(agent, args, None, test_env))
+        if agent.update_steps == 0:
+            update_rel_embed(agent, episode, args)
+            test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
-        #if agent.update_steps % args['eval_every'] == 0:
-        test_scores.append(test(agent, args, None, test_env))
+        if agent.update_steps % 2 == 0:
+            test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == start_step+training_step:
             break
     agent.update_steps=start_step
@@ -261,7 +262,8 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
 
 def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
-    task_results = np.zeros([3, 6])
+    run_steps = 10
+    task_results = np.zeros([int(run_steps/2)+2, 6])
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
     for task in task_names:
@@ -270,7 +272,7 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         #random.shuffle(few_shot_train)
         #random.shuffle(few_shot_dev)
         task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
-                few_shot_dev, 1)
+                few_shot_dev, run_steps)
     task_results /= len(task_names)
     pre_str = 'meta_one_step_'
     for i in range(len(task_results)):
