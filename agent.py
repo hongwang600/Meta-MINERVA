@@ -40,7 +40,6 @@ class Packed(nn.Module):
         return outputs, (h, c)
 
 class AttnEncoder(nn.Module):
-    #docstring for ClassName”“”
     def __init__(self, d_hid):
         super(AttnEncoder, self).__init__()
         self.attn_linear = nn.Linear(d_hid, 1, bias=False)
