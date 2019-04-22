@@ -9,7 +9,7 @@ args = read_options()
 if __name__ == '__main__':
     agent = Agent(args)
     agent.cuda()
-    agent.load(args['save_path'])
+    agent.load(args['save_path'][:-13])
     data = construct_data(args)
     train_data, dev_data, meta_dev_data, few_shot_dev_data = data
     writer = SummaryWriter(args['log_dir'] + args['id'])

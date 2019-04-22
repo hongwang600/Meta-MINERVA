@@ -306,7 +306,7 @@ class Agent(nn.Module):
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
         self.loss = self.entropy_loss + self.rl_loss
-        if embed_loss is not None:
+        if False and embed_loss is not None:
             self.loss += 0.1*embed_loss
             print(embed_loss.data)
         self.optim.zero_grad()

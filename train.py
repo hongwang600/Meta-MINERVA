@@ -208,15 +208,15 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
 def meta_test(agent, args, writer, few_shot_data, test_data):
     embed_size = args['embed_size']
     #reasoner = nn.LSTM(embed_size, embed_size, batch_first=True)
-    reasoner = SimpleEncoder(embed_size, 5, 5)
-    reasoner = reasoner.cuda()
-    reasoner = agent.train_given_reasoner(reasoner, args['path_data_save_path']+'_record_path_')
+    #reasoner = SimpleEncoder(embed_size, 5, 5)
+    #reasoner = reasoner.cuda()
+    #reasoner = agent.train_given_reasoner(reasoner, args['path_data_save_path']+'_record_path_')
     num_meta_step = args['meta_step']
     #task_results = np.zeros([num_meta_step+1, 6])
     task_results = None
     for task in few_shot_data:
         new_results = single_task_meta_test(agent, args, few_shot_data[task],
-                                              test_data[task], num_meta_step, reasoner)
+                                              test_data[task], num_meta_step)
         if task_results is None:
             task_results = new_results
         else:
