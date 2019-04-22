@@ -24,7 +24,7 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
- 
+
 # read parameters
 args = read_options()
 # logging
@@ -47,6 +47,7 @@ def train_one_episode(agent, episode):
 
     record_action_probs = []
     record_probs = []
+    record_actions = []
     for step in range(args['path_length']):
         next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
         next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
@@ -64,9 +65,10 @@ def train_one_episode(agent, episode):
         pre_states = states
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
+        record_actions.append(action_flat)
 
     rewards = episode.get_reward()
-    batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs)
+    batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, record_path_rel=[record_actions, query_rels])
     success_rate = np.sum(rewards) / batch_size
     return batch_loss, avg_reward, success_rate
 
