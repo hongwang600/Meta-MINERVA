@@ -129,6 +129,7 @@ class Agent(nn.Module):
             else:
                 self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda())
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
+        self.path_encoder = SimpleEncoder(self.embed_size, 5, 5)
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
@@ -144,8 +145,8 @@ class Agent(nn.Module):
         batch_size here equals to ortiginal batch_size * num_rollouts
         next_rels, next_ents ---- batch * action_num
         pre_states --- a list of previous RNN states
-        query_rels --- 
-        
+        query_rels ---
+
         """
 
         next_rel_emb = self.relation_emb(next_rels)
@@ -199,7 +200,7 @@ class Agent(nn.Module):
     def init_rnn_states(self, batch_size):
         init = []
         for i in range(self.policy_layers):
-            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))  
+            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))
         return init
 
     def update(self, rewards, record_action_probs, record_probs):
@@ -207,6 +208,29 @@ class Agent(nn.Module):
 
         discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
         discounted_rewards[:,-1] = rewards
+
+        record_actions, query_rels = record_path_rel
+        record_actions = torch.stack(record_actions, 1)
+        embed_loss = None
+        reward_t = torch.from_numpy(rewards)
+        sel_path_idx = reward_t == 1
+        #print(reward_t, sel_path_idx)
+        record_actions = record_actions[sel_path_idx]
+        query_rels = query_rels[sel_path_idx]
+        #self.record_path[0].append(record_actions)
+        #self.record_path[1].append(query_rels)
+        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+            record_action_embed = self.relation_emb(record_actions)
+            query_relation_embed = self.relation_emb(query_rels).detach()
+            #output, (h, c) = self.path_encoder(record_action_embed)
+            h = self.path_encoder(record_action_embed)
+            dis = nn.PairwiseDistance(p=2)
+            #dis = nn.CosineSimilarity(dim=1)
+            h = h.view(query_relation_embed.size())
+            #print(h.size())
+            #print(query_relation_embed.size())
+            embed_loss = torch.mean(dis(h, query_relation_embed))
+
         #discounted_rewards = rewards.transpose()
         for i in range(1, self.path_length):
             discounted_rewards[:, -1-i] = discounted_rewards[:, -1-i] + self.gamma * discounted_rewards[:, -1-i+1]
@@ -233,6 +257,11 @@ class Agent(nn.Module):
 
         self.baseline = self.Lambda * np.mean(discounted_rewards) + (1-self.Lambda) * self.baseline
         self.loss = self.entropy_loss + self.rl_loss
+
+        if embed_loss is not None:
+            self.loss += 0.1*embed_loss
+            print(embed_loss.data)
+
         self.optim.zero_grad()
         self.loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
