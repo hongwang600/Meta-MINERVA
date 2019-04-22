@@ -147,7 +147,7 @@ def train(args):
     beta = args['beta']
 
     # build the agent here
-    agent = Agent(args, use_sgd=True)
+    agent = Agent(args)
     agent.cuda()
     optim = torch.optim.Adam(agent.parameters(), lr=args['alpha2'])
     #print(OrderedDict(agent.named_parameters()))
