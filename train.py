@@ -131,7 +131,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
+    train_env = env(args, mode='train', batcher_triples=few_shot_data)
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))

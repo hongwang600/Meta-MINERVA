@@ -11,6 +11,7 @@ from torch import optim
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_sequence
 from data import get_id_relation, tokenize_relation, build_vocab
+from attention import SimpleEncoder
 
 #from yellowfin import YFOptimizer
 class Packed(nn.Module):
@@ -100,6 +101,7 @@ class Agent(nn.Module):
         """
         super(Agent, self).__init__()
         for k, v in arg.items(): setattr(self, k, v)
+        self.use_path_encoder = True
         self.batch_size *= self.num_rollouts
         self.num_relation = len(self.relation_vocab)
         self.num_entity = len(self.entity_vocab)
@@ -203,7 +205,35 @@ class Agent(nn.Module):
             init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))
         return init
 
-    def update(self, rewards, record_action_probs, record_probs):
+    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None):
+        if reasoner is None:
+            reasoner = self.path_encoder
+        record_actions, query_rels = record_path_rel
+        record_actions = torch.stack(record_actions, 1)
+        #print(query_rels)
+        reward_t = torch.from_numpy(rewards)
+        sel_path_idx = reward_t == 1
+        record_actions = record_actions[sel_path_idx]
+        query_rels = query_rels[sel_path_idx]
+        embed_dict = {}
+        if torch.sum(sel_path_idx) > 0:
+            record_action_embed = self.relation_emb(record_actions)
+            query_relation_embed = self.relation_emb(query_rels)
+            if is_lstm:
+                output, (h, c) = reasoner(record_action_embed)
+            else:
+                h = reasoner(record_action_embed)
+            relation_embed_t = self.relation_emb.weight
+            path_embed =  h.view(query_relation_embed.size())
+            for i in range(len(query_rels)):
+                if query_rels[i] in embed_dict:
+                    embed_dict[query_rels[i]].append(path_embed[i])
+                else:
+                    embed_dict[query_rels[i]] = [path_embed[i]]
+            for rel in embed_dict:
+                relation_embed_t.data[rel] = torch.mean(torch.stack(embed_dict[rel]), 0)
+
+    def update(self, rewards, record_action_probs, record_probs, record_path_rel):
         # discounted rewards
 
         discounted_rewards = np.zeros((rewards.shape[0], self.path_length))
