@@ -124,40 +124,60 @@ def train(args):
             break
     meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
-def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
+def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step, reasoner=None):
     agent = Agent(args)
     agent.cuda()
     agent.load_state_dict(ori_agent.state_dict())
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=few_shot_data)
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
+    update_embed = True
     for episode in train_env.get_episodes():
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        episode = episode[0]
+        if update_embed:
+            update_embed = False
+            update_rel_embed(agent, episode, args, reasoner)
+            test_scores.append(test(agent, args, None, test_env))
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
-        test_scores.append(test(agent, args, None, test_env))
+        if agent.update_steps < 9 or agent.update_steps%10==0:
+            test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == training_step:
             break
     return np.array(test_scores)
 
-def abandoned_meta_test(agent, args, writer, few_shot_data, test_data):
+def meta_test(agent, args, writer, few_shot_data, test_data):
+    embed_size = args['embed_size']
+    #reasoner = nn.LSTM(embed_size, embed_size, batch_first=True)
+    #reasoner = SimpleEncoder(embed_size, 5, 5)
+    #reasoner = reasoner.cuda()
+    #reasoner = agent.train_given_reasoner(reasoner, args['path_data_save_path']+'_record_path_')
     num_meta_step = args['meta_step']
-    task_results = np.zeros([num_meta_step+1, 6])
+    #task_results = np.zeros([num_meta_step+1, 6])
+    task_results = None
     for task in few_shot_data:
-        task_results += single_task_meta_test(agent, args, few_shot_data[task],
+        new_results = single_task_meta_test(agent, args, few_shot_data[task],
                                               test_data[task], num_meta_step)
+        if task_results is None:
+            task_results = new_results
+        else:
+            task_results += new_results
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):
-        writer.add_scalar(pre_str+'Hits1', task_results[i][0], i)
-        writer.add_scalar(pre_str+'Hits3', task_results[i][1], i)
-        writer.add_scalar(pre_str+'Hits5', task_results[i][2], i)
-        writer.add_scalar(pre_str+'Hits10', task_results[i][3], i)
-        writer.add_scalar(pre_str+'Hits20', task_results[i][4], i)
-        writer.add_scalar(pre_str+'AUC', task_results[i][5], i)
+        to_shown_idx = i
+        if i > 10:
+            to_shown_idx = (i-10+1)*10
+        writer.add_scalar(pre_str+'Hits1', task_results[i][0], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits3', task_results[i][1], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits5', task_results[i][2], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits10', task_results[i][3], to_shown_idx)
+        writer.add_scalar(pre_str+'Hits20', task_results[i][4], to_shown_idx)
+        writer.add_scalar(pre_str+'AUC', task_results[i][5], to_shown_idx)
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
@@ -174,6 +194,9 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         #episode = episode[0]
+        if agent.update_steps == 0:
+            update_rel_embed(agent, episode, args)
+            test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         if agent.update_steps % 2 == 0:
             test_scores.append(test(agent, args, None, test_env))
@@ -185,7 +208,7 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
 def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     run_steps = 10
     num_meta_step = args['meta_step']
-    task_results = np.zeros([int(run_steps/2)+1, 6])
+    task_results = np.zeros([int(run_steps/2)+2, 6])
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
     for task in task_names:
@@ -204,6 +227,40 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         writer.add_scalar(pre_str+'Hits10', task_results[i][3], agent.update_steps+i)
         writer.add_scalar(pre_str+'Hits20', task_results[i][4], agent.update_steps+i)
         writer.add_scalar(pre_str+'AUC', task_results[i][5], agent.update_steps+i)
+
+def update_rel_embed(agent, episode, args, reasoner=None):
+    query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
+    batch_size = query_rels.size()[0]
+    state = episode.get_state()
+    pre_rels = Variable(torch.ones(batch_size) * args['relation_vocab']['DUMMY_START_RELATION']).long().cuda()
+    pre_states = agent.init_rnn_states(batch_size)
+
+    record_action_probs = []
+    record_probs = []
+    record_actions = []
+    for step in range(args['path_length']):
+        #print('one_step', step)
+        next_rels = Variable(torch.from_numpy(state['next_relations'])).long().cuda()
+        next_ents = Variable(torch.from_numpy(state['next_entities'])).long().cuda()
+        curr_ents = Variable(torch.from_numpy(state['current_entities'])).long().cuda()
+
+        probs, states = agent(next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents)
+        record_probs.append(probs)
+        action = torch.multinomial(probs, 1).detach()
+        action_flat = action.data.squeeze()
+        action_gather_indice = torch.arange(0, batch_size).long().cuda() * args['max_num_actions'] + action_flat
+        action_prob = probs.view(-1)[action_gather_indice]
+        record_action_probs.append(action_prob)
+        chosen_relations = next_rels.view(-1)[action_gather_indice]
+
+        pre_states = states
+        pre_rels = chosen_relations
+        state = episode(action_flat.cpu().numpy())
+        record_actions.append(action_flat)
+
+    rewards = episode.get_reward()
+    #print(rewards.shape)
+    agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels], reasoner = reasoner)
 
 def test(agent, args, writer, test_env, mode='dev', print_paths=False, is_meta_test=False):
 
