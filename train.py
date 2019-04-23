@@ -27,7 +27,7 @@ from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
 from metalearner import meta_step
 from attention import SimpleEncoder
- 
+
 # read parameters
 args = read_options()
 # logging
@@ -189,7 +189,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
-    #test_scores.append(test(agent, args, None, test_env))
+    test_scores.append(test(agent, args, None, test_env))
     update_embed = True
     for episode in train_env.get_episodes():
         episode = episode[0]
@@ -199,7 +199,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
             test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
-        if agent.update_steps < 10 or agent.update_steps%10==0:
+        if agent.update_steps < 9 or agent.update_steps%10==0:
             test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == training_step:
             break
