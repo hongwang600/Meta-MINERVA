@@ -39,7 +39,6 @@ class Packed(nn.Module):
         return outputs, (h, c)
 
 class AttnEncoder(nn.Module):
-    #docstring for ClassName”“”
     def __init__(self, d_hid):
         super(AttnEncoder, self).__init__()
         self.attn_linear = nn.Linear(d_hid, 1, bias=False)
@@ -145,8 +144,8 @@ class Agent(nn.Module):
         batch_size here equals to ortiginal batch_size * num_rollouts
         next_rels, next_ents ---- batch * action_num
         pre_states --- a list of previous RNN states
-        query_rels --- 
-        
+        query_rels ---
+
         """
 
         next_rel_emb = self.relation_emb(next_rels)
@@ -200,7 +199,7 @@ class Agent(nn.Module):
     def init_rnn_states(self, batch_size):
         init = []
         for i in range(self.policy_layers):
-            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))  
+            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda()), Variable(torch.zeros(batch_size, self.hidden_size).cuda())))
         return init
 
     def update(self, rewards, record_action_probs, record_probs):

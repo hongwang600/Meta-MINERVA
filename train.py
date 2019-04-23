@@ -24,7 +24,7 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
- 
+
 # read parameters
 args = read_options()
 # logging
@@ -95,7 +95,7 @@ def train_on_dataset(train_data, dev_data, writer, args):
 def task_test(agent, args, writer, test_data, task_results, task_id):
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = test(agent, args, None, test_env)
-    task_results += np.array(test_scores) 
+    task_results += np.array(test_scores)
     pre_str = 'ablation_'
     writer.add_scalar(pre_str+'Hits1', test_scores[0], task_id)
     writer.add_scalar(pre_str+'Hits3', test_scores[1], task_id)
@@ -116,10 +116,6 @@ def train(args):
     concated_dev_data = concat_data(dev_data)
     concated_meta_train_data = concat_data(meta_train_data)
     concated_meta_dev_data = concat_data(meta_dev_data)
-    #for task in meta_train_data:
-    #    if len(meta_dev_data[task]) > 0:
-    #        concated_meta_train_data += meta_train_data[task]
-    #        concated_meta_dev_data += meta_dev_data[task]
     #random.shuffle(concated_train_data)
     #random.shuffle(concated_dev_data)
     #print(concated_dev_data)
@@ -148,6 +144,8 @@ def train(args):
     #agent = Agent(args)
     #agent.cuda()
     #agent.load(args['save_path'])
+    train_data.update(meta_train_data)
+    dev_data.update(meta_dev_data)
     for task_id, task in enumerate(train_data):
         if len(dev_data[task])>0:
             count += 1

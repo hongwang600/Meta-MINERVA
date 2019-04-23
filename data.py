@@ -13,8 +13,15 @@ def construct_data(args):
     dev_data = read_json_data(input_dir+'/'+args['dev_file'])
     meta_dev_data = read_json_data(input_dir+'/'+args['meta_dev_file'])
     few_shot_dev_data = read_json_data(input_dir+'/'+args['few_shot_dev_file'])
+    meta_test_data = read_json_data(input_dir+'/meta_test.json')
+    few_shot_test_data = read_json_data(input_dir+'/few_shot_test.json')
+    meta_dev_data.update(meta_test_data)
+    few_shot_dev_data.update(few_shot_test_data)
     for task in few_shot_dev_data:
         few_shot_dev_data[task] = few_shot_dev_data[task][:args['few_shot_size']]
+    for dataset in [train_data, dev_data, meta_dev_data, few_shot_dev_data]:
+        for task in dataset:
+            dataset[task] = dataset[task][:args['few_shot_size']]
     return [train_data, dev_data, meta_dev_data, few_shot_dev_data]
 
 def concat_data(data):

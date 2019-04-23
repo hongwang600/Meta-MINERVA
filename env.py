@@ -63,13 +63,13 @@ class RelationEntityBatcher():
                     e2 = self.entity_vocab[e2]
                     self.store.append([e1,r,e2])
             self.store = np.array(self.store)
-            fact_files = ['train.txt', 'test.txt', 'dev.txt', 'graph.txt']
-            if os.path.isfile(self.input_dir+'/'+'full_graph.txt'):
-                fact_files = ['full_graph.txt']
+            fact_files = ['train.txt', 'test.txt', 'dev.txt', 'ori_graph.txt']
+            if os.path.isfile(self.input_dir+'/'+'full_ori_graph.txt'):
+                fact_files = ['full_ori_graph.txt']
                 print("Contains full graph")
 
             for f in fact_files:
-            # for f in ['graph.txt']:
+            # for f in ['ori_graph.txt']:
                 with open(self.input_dir+'/'+f) as raw_input_file:
                     csv_file = csv.reader(raw_input_file, delimiter='\t')
                     for line in csv_file:
@@ -120,7 +120,7 @@ class RelationEntityBatcher():
             for i in range(e1.shape[0]):
                 all_e2s.append(self.store_all_correct[(e1[i], r[i])])
             assert e1.shape[0] == e2.shape[0] == r.shape[0] == len(all_e2s)
-            yield e1, r, e2, all_e2s          
+            yield e1, r, e2, all_e2s
 
 
     def yield_next_batch_test(self):
@@ -241,7 +241,7 @@ class Episode(object):
         self.positive_reward = positive_reward
         self.negative_reward = negative_reward
         start_entities = np.repeat(start_entities, self.num_rollouts) # shape (batch_size*num_rollouts,)
-        batch_query_relation = np.repeat(query_relation, self.num_rollouts) 
+        batch_query_relation = np.repeat(query_relation, self.num_rollouts)
         end_entities = np.repeat(end_entities, self.num_rollouts)
         self.start_entities = start_entities
         self.end_entities = end_entities
@@ -335,7 +335,7 @@ class env(object):
                                                  )
 
             self.total_no_examples = self.batcher.store.shape[0]
-        self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'graph.txt',
+        self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'ori_graph.txt',
                                              max_num_actions=params['max_num_actions'],
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])
