@@ -137,12 +137,12 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     test_scores.append(test(agent, args, None, test_env))
     update_embed = True
     for episode in train_env.get_episodes():
-        episode = episode[0]
+        #episode = episode[0]
         if update_embed:
             update_embed = False
             update_rel_embed(agent, episode, args, reasoner)
             test_scores.append(test(agent, args, None, test_env))
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
+        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         #if agent.update_steps % args['eval_every'] == 0:
         if agent.update_steps < 9 or agent.update_steps%10==0:
             test_scores.append(test(agent, args, None, test_env))
