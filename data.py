@@ -19,9 +19,12 @@ def construct_data(args):
     few_shot_dev_data.update(few_shot_test_data)
     for task in few_shot_dev_data:
         few_shot_dev_data[task] = few_shot_dev_data[task][:args['few_shot_size']]
-    for dataset in [train_data, dev_data, meta_dev_data, few_shot_dev_data]:
+    for dataset in [train_data, few_shot_dev_data]:
         for task in dataset:
             dataset[task] = dataset[task][:args['few_shot_size']]
+    for dataset in [dev_data, meta_dev_data]:
+        for task in dataset:
+            dataset[task] = dataset[task][:100]
     return [train_data, dev_data, meta_dev_data, few_shot_dev_data]
 
 def concat_data(data):

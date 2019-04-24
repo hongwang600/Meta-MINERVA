@@ -70,11 +70,13 @@ def train_one_episode(agent, episode):
     success_rate = np.sum(rewards) / batch_size
     return batch_loss, avg_reward, success_rate
 
-def train_on_dataset(train_data, dev_data, writer, args):
+def train_on_dataset(train_data, dev_data, writer, args, iters=None, base_agent=None):
     train_env = env(args, mode='train', batcher_triples=train_data)
     dev_env = env(args, mode='dev', batcher_triples=dev_data)
     agent = Agent(args)
     agent.cuda()
+    if base_agent is not None:
+        base_agent.load_state_dict(base_agent.state_dict())
 
     for episode in train_env.get_episodes():
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
@@ -88,6 +90,9 @@ def train_on_dataset(train_data, dev_data, writer, args):
             test(agent, args, writer, dev_env)
 
         if agent.update_steps > args['total_iterations']:
+            agent.save(args['save_path'])
+            break
+        if iters is not None and agent.update_steps > iters:
             agent.save(args['save_path'])
             break
     return agent
@@ -140,7 +145,7 @@ def train(args):
     #to_dev_data = concated_meta_dev_data
     random.shuffle(to_train_data)
     random.shuffle(to_dev_data)
-    #agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
+    base_agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
     #agent = Agent(args)
     #agent.cuda()
     #agent.load(args['save_path'])
@@ -149,7 +154,7 @@ def train(args):
     for task_id, task in enumerate(train_data):
         if len(dev_data[task])>0:
             count += 1
-            agent = train_on_dataset(train_data[task], dev_data[task], writer, args)
+            agent = train_on_dataset(train_data[task], dev_data[task], writer, args, 50, base_agent)
             task_results = task_test(agent, args, writer, dev_data[task], task_results, task_id)
             del agent
     task_results /= count
