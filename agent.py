@@ -149,8 +149,8 @@ class Agent(nn.Module):
         batch_size here equals to ortiginal batch_size * num_rollouts
         next_rels, next_ents ---- batch * action_num
         pre_states --- a list of previous RNN states
-        query_rels --- 
-        
+        query_rels ---
+
         """
         #if params is None:
         #    params = OrderedDict(self.named_parameters())
@@ -207,7 +207,7 @@ class Agent(nn.Module):
     def init_rnn_states(self, batch_size):
         init = []
         for i in range(self.policy_layers):
-            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id)), Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id))))  
+            init.append((Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id)), Variable(torch.zeros(batch_size, self.hidden_size).cuda(self.cuda_id))))
         return init
 
     def decay_lr(self):
@@ -316,8 +316,8 @@ class Agent(nn.Module):
 
         #return self.loss.item(), np.mean(rewards)
     def update_params(self, loss, step_size=0.5, first_order=False):
-        """Apply one step of gradient descent on the loss function `loss`, with 
-        step-size `step_size`, and returns the updated parameters of the neural 
+        """Apply one step of gradient descent on the loss function `loss`, with
+        step-size `step_size`, and returns the updated parameters of the neural
         network.
         """
         #grads = torch.autograd.grad(loss, self.parameters(),
@@ -326,6 +326,8 @@ class Agent(nn.Module):
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
         updated_params = OrderedDict()
+        self.relation_emb.zero_grad()
+        self.entity_emb.zero_grad()
         #for (name, param), grad in zip(self.named_parameters(), grads):
         for (name, param) in self.named_parameters():
             updated_params[name] = param.clone()
