@@ -326,8 +326,8 @@ class Agent(nn.Module):
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
         updated_params = OrderedDict()
-        self.relation_emb.zero_grad()
-        self.entity_emb.zero_grad()
+        #self.relation_emb.zero_grad()
+        #self.entity_emb.zero_grad()
         #for (name, param), grad in zip(self.named_parameters(), grads):
         for (name, param) in self.named_parameters():
             updated_params[name] = param.clone()
