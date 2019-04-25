@@ -195,7 +195,7 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         task_results.append(one_step_single_task_meta_test(agent, args, few_shot_train,
                 few_shot_dev, run_steps))
     task_results = np.stack(task_results)
-    task_results = np.median(task_result, 0)
+    task_results = np.median(task_results, 0)
     pre_str = 'meta_one_step_'
     for i in range(len(task_results)):
         writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
