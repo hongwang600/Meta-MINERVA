@@ -59,6 +59,7 @@ class RelationEntityBatcher():
             #with open(input_file) as raw_input_file:
                 #csv_file = csv.reader(raw_input_file, delimiter = '\t' )
                 #for line in csv_file:
+            self.batch_size = max(120, self.batch_size)
             for line in batcher_triples:
                 e1 = line[0]
                 r = line[1]

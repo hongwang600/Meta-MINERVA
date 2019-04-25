@@ -211,7 +211,8 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
 def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
     run_steps = 10
-    task_results = np.zeros([int(run_steps/2)+1, 6])
+    #task_results = np.zeros([int(run_steps/2)+1, 6])
+    task_results = []
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
     for task in task_names:
@@ -219,9 +220,10 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         few_shot_dev = test_data[task][:200]
         #random.shuffle(few_shot_train)
         #random.shuffle(few_shot_dev)
-        task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
-                few_shot_dev, run_steps)
-    task_results /= len(task_names)
+        task_results.append(one_step_single_task_meta_test(agent, args, few_shot_train,
+                few_shot_dev, run_steps))
+    task_results = np.stack(task_results)
+    task_results = np.median(task_results, 0)
     pre_str = 'meta_one_step_'
     for i in range(len(task_results)):
         writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
