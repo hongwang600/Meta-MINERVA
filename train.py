@@ -194,11 +194,14 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
+    update_embed = True
+    counter = 0
     for episode in train_env.get_episodes():
-        #episode = episode[0]
-        if agent.update_steps == 0:
-            update_rel_embed(agent, episode, args)
-            test_scores.append(test(agent, args, None, test_env))
+        while update_embed:
+            if update_rel_embed(agent, episode, args, reasoner) or counter>10:
+                update_embed = False
+                test_scores.append(test(agent, args, None, test_env))
+            counter += 1
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         if agent.update_steps % 2 == 0:
             test_scores.append(test(agent, args, None, test_env))
