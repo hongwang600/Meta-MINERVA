@@ -198,7 +198,7 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     counter = 0
     for episode in train_env.get_episodes():
         while update_embed:
-            if update_rel_embed(agent, episode, args, reasoner) or counter>10:
+            if update_rel_embed(agent, episode, args) or counter>10:
                 update_embed = False
                 test_scores.append(test(agent, args, None, test_env))
             counter += 1
