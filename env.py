@@ -63,13 +63,13 @@ class RelationEntityBatcher():
                     e2 = self.entity_vocab[e2]
                     self.store.append([e1,r,e2])
             self.store = np.array(self.store)
-            fact_files = ['train.txt', 'test.txt', 'dev.txt', 'ori_graph.txt']
-            if os.path.isfile(self.input_dir+'/'+'full_ori_graph.txt'):
-                fact_files = ['full_ori_graph.txt']
+            fact_files = ['train.txt', 'test.txt', 'dev.txt', 'graph.txt']
+            if os.path.isfile(self.input_dir+'/'+'full_graph.txt'):
+                fact_files = ['full_graph.txt']
                 print("Contains full graph")
 
             for f in fact_files:
-            # for f in ['ori_graph.txt']:
+            # for f in ['graph.txt']:
                 with open(self.input_dir+'/'+f) as raw_input_file:
                     csv_file = csv.reader(raw_input_file, delimiter='\t')
                     for line in csv_file:
@@ -335,7 +335,7 @@ class env(object):
                                                  )
 
             self.total_no_examples = self.batcher.store.shape[0]
-        self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'ori_graph.txt',
+        self.grapher = RelationEntityGrapher(triple_store=params['data_input_dir'] + '/' + 'graph.txt',
                                              max_num_actions=params['max_num_actions'],
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])

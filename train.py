@@ -17,6 +17,7 @@ import os
 from collections import defaultdict
 import shutil
 import copy
+import json
 
 from tensorboardX import SummaryWriter
 
@@ -76,7 +77,7 @@ def train_on_dataset(train_data, dev_data, writer, args, iters=None, base_agent=
     agent = Agent(args)
     agent.cuda()
     if base_agent is not None:
-        base_agent.load_state_dict(base_agent.state_dict())
+        agent.load_state_dict(base_agent.state_dict())
 
     for episode in train_env.get_episodes():
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
@@ -145,17 +146,20 @@ def train(args):
     #to_dev_data = concated_meta_dev_data
     random.shuffle(to_train_data)
     random.shuffle(to_dev_data)
-    base_agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
+    base_agent = None
+    #base_agent = train_on_dataset(to_train_data, to_dev_data, writer, args)
     #agent = Agent(args)
     #agent.cuda()
     #agent.load(args['save_path'])
     train_data.update(meta_train_data)
     dev_data.update(meta_dev_data)
+    id_task = {}
     for task_id, task in enumerate(train_data):
         if len(dev_data[task])>0:
             count += 1
             agent = train_on_dataset(train_data[task], dev_data[task], writer, args, 50, base_agent)
             task_results = task_test(agent, args, writer, dev_data[task], task_results, task_id)
+            id_task[task_id] = task
             del agent
     task_results /= count
     print(task_results)
@@ -167,6 +171,8 @@ def train(args):
     writer.add_scalar(pre_str+'Hits20', task_results[4], count)
     writer.add_scalar(pre_str+'AUC', task_results[5], count)
     writer.close()
+    with open(args['id']+'id_to_task.json', 'w') as f_out:
+        json.dump(id_task, f_out)
 
 
 def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
