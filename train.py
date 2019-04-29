@@ -115,7 +115,7 @@ def update_rel_embed(agent, episode, args, reasoner=None):
 
     rewards = episode.get_reward()
     #print(rewards.shape)
-    agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels], reasoner = reasoner)
+    return agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels], reasoner = reasoner)
 
 def train(args):
     data = construct_data(args)
@@ -166,14 +166,14 @@ def train(args):
 
         #one_step_meta_test(agent, args, writer, train_data, dev_data)
         if agent.update_steps % args['eval_every'] == 0:
-            agent.save_record_path(args['save_path']+'_record_path_')
+            #agent.save_record_path(args['save_path']+'_record_path_')
             agent.save(args['save_path']+'_'+str(agent.update_steps))
             test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
 
         if agent.update_steps > args['total_iterations']:
-            agent.save_record_path(args['save_path']+'_record_path_')
+            #agent.save_record_path(args['save_path']+'_record_path_')
             #agent.train_path_reasoner()
             agent.save(args['save_path'])
             break
@@ -193,9 +193,14 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     update_embed = True
     for episode in train_env.get_episodes():
         episode = episode[0]
-        if update_embed:
-            update_embed = False
-            update_rel_embed(agent, episode, args, reasoner)
+        try_num = 0
+        while update_embed and try_num < 10:
+            update_embed = update_rel_embed(agent, episode, args, reasoner)
+            if update_embed:
+                update_embed = False
+                test_scores.append(test(agent, args, None, test_env))
+            try_num += 1
+        if agent.update_steps == 0:
             test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
@@ -247,10 +252,16 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
+    update_embed = True
     for episode in train_env.get_episodes():
         episode = episode[0]
+        try_num = 0
+        while update_embed and try_num < 10:
+            update_embed = update_rel_embed(agent, episode, args)
+            if update_embed:
+                update_embed = False
+            try_num += 1
         if agent.update_steps == 0:
-            update_rel_embed(agent, episode, args)
             test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         if agent.update_steps % 2 == 0:
