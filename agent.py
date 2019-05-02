@@ -137,8 +137,8 @@ class Agent(nn.Module):
             else:
                 self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda(self.cuda_id))
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
-        self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
-        #self.path_encoder = SimpleEncoder(self.embed_size, 5, 5)
+        #self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
+        self.path_encoder = SimpleEncoder(self.embed_size, 2, 2)
         self.surrogate_path = {}
         self.surrogate_path_limit = 32
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
@@ -203,15 +203,15 @@ class Agent(nn.Module):
         token_ids = pad_sequence(token_ids)
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(self.cuda_id), token_lengths.cuda(self.cuda_id)
-    
+
     def query_relation_emb(self, relation_ids):
         query_rel = relation_ids[0]
         rel_id =  int(query_rel)
         if rel_id in self.surrogate_path:
             record_actions = self.surrogate_path[rel_id]
             record_action_embed = self.relation_emb(record_actions)
-            output, (h, c) = self.path_encoder(record_action_embed)
-            #h = self.path_encoder(record_action_embed)
+            #output, (h, c) = self.path_encoder(record_action_embed)
+            h = self.path_encoder(record_action_embed)
             h = h.view(len(record_actions), -1)
             query_rel_embed = torch.mean(h, 0)
         else:
@@ -242,7 +242,7 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
-    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=True, reasoner=None):
+    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None):
         if reasoner is None:
             reasoner = self.path_encoder
         record_actions, query_rels = record_path_rel
@@ -487,7 +487,8 @@ class Agent(nn.Module):
                 batch_y = query_rels[i*batch_size:(i+1)*batch_size]
                 x_embed = self.relation_emb(batch_x)
                 y_embed = self.relation_emb(batch_y)
-                output, (h, c) = self.path_encoder(x_embed)
+                #output, (h, c) = self.path_encoder(x_embed)
+                h = self.paath_encoder(x_embed)
                 path_enc = h.view(y_embed.size())
                 dis = nn.PairwiseDistance(p=2)
                 embed_loss = torch.mean(dis(path_enc, y_embed))
