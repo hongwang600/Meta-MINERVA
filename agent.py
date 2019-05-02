@@ -136,7 +136,9 @@ class Agent(nn.Module):
 
         self.update_steps = 0
         if not use_sgd:
-            self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+            #self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+            self.optim = optim.Adam(list(self.relation_emb.parameters())+
+                    list(self.entity_emb.parameters()), lr=self.learning_rate)
         else:
             self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
 

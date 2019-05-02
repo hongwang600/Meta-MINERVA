@@ -26,7 +26,7 @@ from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
 from metalearner import meta_step
- 
+
 # read parameters
 args = read_options()
 # logging
@@ -459,5 +459,3 @@ if __name__ == '__main__':
         test(agent, args, writer, test_env, mode='test')
     else:
         train(args)
-
-
