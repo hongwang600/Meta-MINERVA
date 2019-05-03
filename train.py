@@ -191,14 +191,16 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
     update_embed = True
+    try_num = 0
     for episode in train_env.get_episodes():
         episode = episode[0]
-        try_num = 0
-        while update_embed and try_num < 10:
+        #while update_embed and try_num < 10:
+        while update_embed:
             update_embed = update_rel_embed(agent, episode, args, reasoner)
-            if update_embed:
-                update_embed = False
-                test_scores.append(test(agent, args, None, test_env))
+            if try_num >=10:
+                #update_embed = False
+                #test_scores.append(test(agent, args, None, test_env))
+                break
             try_num += 1
         if agent.update_steps == 0:
             test_scores.append(test(agent, args, None, test_env))

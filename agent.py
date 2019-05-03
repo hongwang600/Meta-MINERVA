@@ -270,8 +270,8 @@ class Agent(nn.Module):
                     embed_dict[query_rels[i]] = [path_embed[i]]
             for rel in embed_dict:
                 relation_embed_t.data[rel] = torch.mean(torch.stack(embed_dict[rel]), 0)
-            return True
-        return False
+            return False
+        return True
 
     def update(self, rewards, record_action_probs, record_probs, record_path_rel, decay_lr=False, args=None):
         # discounted rewards
