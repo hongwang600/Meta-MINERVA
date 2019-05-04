@@ -139,8 +139,10 @@ class Agent(nn.Module):
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
         #self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
         self.path_encoder = SimpleEncoder(self.embed_size, 2, 2)
+        #self.path_encoder = None
         self.surrogate_path = {}
-        self.surrogate_path_limit = 32
+        self.seen_query_rels = []
+        self.surrogate_path_limit = 64
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
@@ -209,15 +211,17 @@ class Agent(nn.Module):
         rel_id =  int(query_rel)
         if rel_id in self.surrogate_path:
             record_actions = self.surrogate_path[rel_id]
-            record_action_embed = self.relation_emb(record_actions)
+            record_action_embed = self.relation_emb(record_actions).detach()
+            #record_action_embed = self.relation_emb(record_actions)
             #output, (h, c) = self.path_encoder(record_action_embed)
             h = self.path_encoder(record_action_embed)
             h = h.view(len(record_actions), -1)
             query_rel_embed = torch.mean(h, 0)
         else:
+            return self.relation_emb(relation_ids)
             query_rel_embed = self.relation_emb(query_rel)
         #print(query_rel_embed.size())
-        return query_rel_embed.view(1,-1).expand(len(relation_ids), -1)
+        return query_rel_embed.view(1,-1).expand(len(relation_ids), -1).contiguous()
 
 
     def _relation_emb(self, relation_ids):
@@ -291,7 +295,7 @@ class Agent(nn.Module):
         query_rels = query_rels[sel_path_idx]
         #self.record_path[0].append(record_actions)
         #self.record_path[1].append(query_rels)
-        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+        if False and self.use_path_encoder and torch.sum(sel_path_idx) > 0:
             query_rel_id = int(query_rels[0])
             self.surrogate_path[query_rel_id] = record_actions if query_rel_id not in self.surrogate_path\
                     else torch.cat((self.surrogate_path[query_rel_id], record_actions), 0)
@@ -382,6 +386,9 @@ class Agent(nn.Module):
 
         record_actions, query_rels = record_path_rel
         record_actions = torch.stack(record_actions, 1)
+        query_rel_id = int(query_rels[0])
+        if query_rel_id not in self.seen_query_rels:
+            self.seen_query_rels.append(query_rel_id)
         embed_loss = None
         reward_t = torch.from_numpy(rewards)
         sel_path_idx = reward_t == 1
@@ -452,7 +459,7 @@ class Agent(nn.Module):
             # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
         #return self.loss.item(), np.mean(rewards)
-    def update_params(self, loss, step_size=0.5, first_order=False):
+    def update_params(self, loss, step_size=0.5, only_path_encoder=False):
         """Apply one step of gradient descent on the loss function `loss`, with
         step-size `step_size`, and returns the updated parameters of the neural
         network.
@@ -462,9 +469,10 @@ class Agent(nn.Module):
         self.optim.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
-        updated_params = self.state_dict()
+        updated_params = self.path_encoder.state_dict() if only_path_encoder else self.state_dict()
         #for (name, param), grad in zip(self.named_parameters(), grads):
-        for (name, param) in self.named_parameters():
+        grad_params = self.path_encoder.named_parameters() if only_path_encoder else self.named_parameters()
+        for (name, param) in grad_params:
             updated_params[name] = param.clone()
             if param.grad is not None:
                 updated_params[name] -= step_size * param.grad
@@ -542,3 +550,17 @@ class Agent(nn.Module):
                 embed_loss.backward()
                 optim.step()
         return model
+    def update_seen_query_embeds(self):
+        for rel in self.seen_query_rels:
+            rel_embed = self.query_relation_emb([torch.tensor(rel).cuda()])
+            relation_embed_t = self.relation_emb.weight
+            relation_embed_t.data[rel] = rel_embed
+    def update_path_set(self, record_actions, query_id):
+        record_actions = torch.stack(record_actions, 1)
+        sel_idx = np.random.choice(len(record_actions), self.surrogate_path_limit)
+        #self.surrogate_path[query_id] = record_actions[sel_idx]
+        self.surrogate_path[query_id] = record_actions if query_id not in self.surrogate_path\
+                    else torch.cat((self.surrogate_path[query_id], record_actions), 0)
+        self.surrogate_path[query_id] = self.surrogate_path[query_id][-self.surrogate_path_limit:]
+    def set_path_encoder(self):
+        self.path_encoder = SimpleEncoder(self.embed_size, 2, 2)

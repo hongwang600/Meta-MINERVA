@@ -89,7 +89,7 @@ class RelationEntityBatcher():
                             self.store_all_correct[(e1, r)].add(e2)
 
 
-    def yield_next_batch_train(self):
+    def yield_next_batch_train(self, all_tasks=False):
         '''
         randomly sample a batch of triples for training
         '''
@@ -108,13 +108,14 @@ class RelationEntityBatcher():
         np.random.shuffle(self.store)
         remaining_triples = self.store.shape[0]
         current_idx = 0
+        batch_size = 128 if all_tasks else self.batch_size
         while True:
             if remaining_triples == 0:
                 np.random.shuffle(self.store)
-            if remaining_triples - self.batch_size > 0:
-                batch_idx = np.arange(current_idx, current_idx+self.batch_size)
-                current_idx += self.batch_size
-                remaining_triples -= self.batch_size
+            if remaining_triples - batch_size > 0:
+                batch_idx = np.arange(current_idx, current_idx+batch_size)
+                current_idx += batch_size
+                remaining_triples -= batch_size
             else:
                 batch_idx = np.arange(current_idx, self.store.shape[0])
                 remaining_triples = 0
@@ -126,7 +127,7 @@ class RelationEntityBatcher():
             for i in range(e1.shape[0]):
                 all_e2s.append(self.store_all_correct[(e1[i], r[i])])
             assert e1.shape[0] == e2.shape[0] == r.shape[0] == len(all_e2s)
-            yield e1, r, e2, all_e2s          
+            yield e1, r, e2, all_e2s
 
 
     def yield_next_batch_test(self):
@@ -237,7 +238,7 @@ class Episode(object):
         self.grapher = graph
         self.batch_size, self.path_len, num_rollouts, test_rollouts, positive_reward, negative_reward, mode, batcher = params
         if extra_rollout:
-            num_rollouts *= 5
+            num_rollouts *= 50
         self.mode = mode
         if self.mode == 'train':
             self.num_rollouts = num_rollouts
@@ -249,7 +250,7 @@ class Episode(object):
         self.positive_reward = positive_reward
         self.negative_reward = negative_reward
         start_entities = np.repeat(start_entities, self.num_rollouts) # shape (batch_size*num_rollouts,)
-        batch_query_relation = np.repeat(query_relation, self.num_rollouts) 
+        batch_query_relation = np.repeat(query_relation, self.num_rollouts)
         end_entities = np.repeat(end_entities, self.num_rollouts)
         self.start_entities = start_entities
         self.end_entities = end_entities
@@ -326,7 +327,7 @@ class Episode(object):
 
 
 class env(object):
-    def __init__(self, params, mode='train', batcher_triples=[], dev_triple=None):
+    def __init__(self, params, mode='train', batcher_triples=[], dev_triple=None, extra_rollout=False):
 
         self.batch_size = params['batch_size']
         self.num_rollouts = params['num_rollouts']
@@ -338,7 +339,7 @@ class env(object):
         self.num_meta_tasks = params['num_meta_tasks']
         input_dir = params['data_input_dir']
         self.dev_batcher = []
-        self.extra_rollout = params['extra_rollout']
+        self.extra_rollout = params['extra_rollout'] or extra_rollout
         if mode == 'train':
             self.batcher = []
             if dev_triple is None:
@@ -380,13 +381,13 @@ class env(object):
                                              entity_vocab=params['entity_vocab'],
                                              relation_vocab=params['relation_vocab'])
 
-    def get_episodes(self):
+    def get_episodes(self, all_tasks=False):
         params = self.batch_size, self.path_len, self.num_rollouts, self.test_rollouts, self.positive_reward, self.negative_reward, self.mode, self.batcher
         if self.mode == 'train':
             # yield_next_batch_train will return batched e1, r, e1 and all correct e2s
-            batch_generaters = [task_batcher.yield_next_batch_train()
+            batch_generaters = [task_batcher.yield_next_batch_train(all_tasks)
                                 for task_batcher in self.batcher]
-            dev_batch_generaters = [task_batcher.yield_next_batch_train()
+            dev_batch_generaters = [task_batcher.yield_next_batch_train(all_tasks)
                                 for task_batcher in self.dev_batcher]
             batcher_data_size = [_.data_size for _ in self.batcher]
             batcher_pro = [_ / float(sum(batcher_data_size)) for _ in batcher_data_size]
@@ -394,8 +395,12 @@ class env(object):
                 ret_episodes = []
                 #random.shuffle(batch_generaters)
                 indexs = list(range(len(batch_generaters)))
-                sel_indexs = np.random.choice(indexs, min(self.num_meta_tasks, len(batch_generaters)),
-                                                replace=False, p=batcher_pro)
+                if all_tasks:
+                    sel_indexs = np.random.choice(indexs, len(batch_generaters),
+                                                    replace=False, p=batcher_pro)
+                else:
+                    sel_indexs = np.random.choice(indexs, min(self.num_meta_tasks, len(batch_generaters)),
+                                                    replace=False, p=batcher_pro)
                 for i in sel_indexs:
                     data = next(batch_generaters[i])
                     # print data[0].shape # (512,)

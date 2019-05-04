@@ -41,7 +41,7 @@ logfile = logging.FileHandler(args['log_path'], 'w')
 logfile.setFormatter(formatter)
 logger.addHandler(logfile)
 
-def train_one_episode(agent, episode, args):
+def train_one_episode(agent, episode, args, update_path_set=False):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -70,6 +70,10 @@ def train_one_episode(agent, episode, args):
         pre_rels = chosen_relations
         state = episode(action_flat.cpu().numpy())
         record_actions.append(action_flat)
+
+    if update_path_set:
+        agent.update_path_set(record_actions, int(query_rels[0]))
+        return None
 
     if args['new_reward']:
         rewards = episode.get_acc_reward()
@@ -148,15 +152,27 @@ def train(args):
 
     # build the agent here
     agent = Agent(args)
-    agent.cuda()
+    #agent.load(args['save_path'][:-6])
+    #agent.set_path_encoder()
     optim = torch.optim.Adam(agent.parameters(), lr=args['alpha2'])
+    agent.cuda()
     #print(OrderedDict(agent.named_parameters()))
 
     #meta_learner = MetaLearner(train_env, agent)
 
     for episode in train_env.get_episodes():
         #print('get episode')
-        batch_loss = meta_step(agent, episode, optim, args)
+        if agent.update_steps < 10000:
+            batch_loss = meta_step(agent, episode, optim, args)
+        else:
+            batch_loss = meta_step(agent, episode, optim, args, True)
+        #if agent.update_steps == 1000:
+        if agent.update_steps %50==50000:
+            agent.save(args['save_path']+'_'+str(agent.update_steps))
+            all_task_episode = next(train_env.get_episodes(True))
+            for one_task_episode in all_task_episode:
+                train_one_episode(agent, one_task_episode[0], args, True)
+
         #batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         writer.add_scalar('batch_loss', batch_loss, agent.update_steps)
         #writer.add_scalar('avg_reward', avg_reward, agent.update_steps)
@@ -170,6 +186,21 @@ def train(args):
             agent.save(args['save_path']+'_'+str(agent.update_steps))
             test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
+            '''
+            if agent.update_steps == 500:
+                all_task_episode = next(train_env.get_episodes(True))
+                for one_task_episode in all_task_episode:
+                    train_one_episode(agent, one_task_episode[0], args, True)
+            if agent.update_steps >= 1000:
+                agent.update_seen_query_embeds()
+                all_task_episode = next(train_env.get_episodes(True))
+                for one_task_episode in all_task_episode:
+                    train_one_episode(agent, one_task_episode[0], args, True)
+            '''
+        #if agent.update_steps % 50 ==0:
+        #    all_task_episode = next(train_env.get_episodes(True))
+        #    for one_task_episode in all_task_episode:
+        #        train_one_episode(agent, one_task_episode[0], args, True)
 
 
         if agent.update_steps > args['total_iterations']:
@@ -186,24 +217,26 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data], extra_rollout=True)
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
-    update_embed = True
-    try_num = 0
+    for try_num in range(50):
+        update_rel_embed(agent, episode_args, reasoner)
+    test_scores.append(test(agent, args, None, test_env))
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     for episode in train_env.get_episodes():
         episode = episode[0]
         #while update_embed and try_num < 10:
-        while update_embed:
+        while False:
             update_embed = update_rel_embed(agent, episode, args, reasoner)
             if try_num >=10:
                 #update_embed = False
                 #test_scores.append(test(agent, args, None, test_env))
                 break
             try_num += 1
-        if agent.update_steps == 0:
-            test_scores.append(test(agent, args, None, test_env))
+        #if agent.update_steps == 0:
+        #    test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
         if agent.update_steps < 9 or agent.update_steps%10==0:
@@ -244,6 +277,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
     agent = Agent(args)
+    #agent.set_path_encoder()
     agent.cuda()
     agent.load_state_dict(ori_agent.state_dict())
     #print(agent.update_steps)
@@ -258,10 +292,10 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     for episode in train_env.get_episodes():
         episode = episode[0]
         try_num = 0
-        while update_embed and try_num < 10:
+        while update_embed and try_num < 100:
             update_embed = update_rel_embed(agent, episode, args)
-            if update_embed:
-                update_embed = False
+            #if update_embed:
+            #    update_embed = False
             try_num += 1
         if agent.update_steps == 0:
             test_scores.append(test(agent, args, None, test_env))
