@@ -217,21 +217,23 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     #print(agent.update_steps)
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data], extra_rollout=True)
+    #train_env = env(args, mode='train', batcher_triples=[few_shot_data], extra_rollout=True)
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
-    for try_num in range(50):
-        update_rel_embed(agent, episode_args, reasoner)
-    test_scores.append(test(agent, args, None, test_env))
+    #for try_num in range(50):
+    #    update_rel_embed(agent, episode, args, reasoner)
+    #test_scores.append(test(agent, args, None, test_env))
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
+    update_embed = True
+    try_num = 0
     for episode in train_env.get_episodes():
         episode = episode[0]
-        #while update_embed and try_num < 10:
-        while False:
-            update_embed = update_rel_embed(agent, episode, args, reasoner)
+        while update_embed and try_num < 10:
+        #while False:
+            update_rel_embed(agent, episode, args, reasoner)
             if try_num >=10:
-                #update_embed = False
+                update_embed = False
                 #test_scores.append(test(agent, args, None, test_env))
                 break
             try_num += 1
