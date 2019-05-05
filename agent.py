@@ -159,7 +159,8 @@ class Agent(nn.Module):
         next_ent_emb = self.entity_emb(next_ents)
         action_emb = torch.cat((next_rel_emb, next_ent_emb), dim=2) # batch_size * action_num * 2d
 
-        query_rel_emb = self.relation_emb(query_rels)
+        #query_rel_emb = self.relation_emb(query_rels)
+        query_rel_emb = self.relation_emb(torch.zeros(query_rels.size()).long().cuda())
         curr_ent_emb = self.entity_emb(curr_ents)
         pre_rel_emb = self.relation_emb(pre_rels)
 
