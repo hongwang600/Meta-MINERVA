@@ -142,7 +142,7 @@ class Agent(nn.Module):
         #self.path_encoder = None
         self.surrogate_path = {}
         self.seen_query_rels = []
-        self.surrogate_path_limit = 64
+        self.surrogate_path_limit = 128
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
@@ -211,6 +211,8 @@ class Agent(nn.Module):
         rel_id =  int(query_rel)
         if rel_id in self.surrogate_path:
             record_actions = self.surrogate_path[rel_id]
+            sel_idx = np.random.choice(list(range(len(record_actions))), 16)
+            record_actions = record_actions[sel_idx]
             record_action_embed = self.relation_emb(record_actions).detach()
             #record_action_embed = self.relation_emb(record_actions)
             #output, (h, c) = self.path_encoder(record_action_embed)
