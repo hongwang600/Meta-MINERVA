@@ -172,7 +172,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
             task_results = new_results
         else:
             task_results += new_results
-        sep_results.appen(new_results)
+        sep_results.append(new_results)
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):
@@ -190,7 +190,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
             to_shown_idx = i
             if i > 10:
                 to_shown_idx = (i-10+1)*10
-            writer.add_scalar('task_'+str(task_id)+'_AUC', task_results[5], to_shown_idx)
+            writer.add_scalar('task_'+str(task_id)+'_AUC', task_results[i][5], to_shown_idx)
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
