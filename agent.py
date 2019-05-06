@@ -212,6 +212,7 @@ class Agent(nn.Module):
         if rel_id in self.surrogate_path:
             record_actions = self.surrogate_path[rel_id]
             sel_idx = np.random.choice(list(range(len(record_actions))), 16)
+            #sel_idx = list(range(len(record_actions)))
             record_actions = record_actions[sel_idx]
             record_action_embed = self.relation_emb(record_actions).detach()
             #record_action_embed = self.relation_emb(record_actions)
@@ -248,7 +249,7 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
-    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None):
+    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None, not_updated = True):
         if reasoner is None:
             reasoner = self.path_encoder
         record_actions, query_rels = record_path_rel
@@ -259,12 +260,12 @@ class Agent(nn.Module):
         record_actions = record_actions[sel_path_idx]
         query_rels = query_rels[sel_path_idx]
         embed_dict = {}
-        if False and torch.sum(sel_path_idx) > 0:
+        if torch.sum(sel_path_idx) > 0:
             query_rel_id = int(query_rels[0])
             self.surrogate_path[query_rel_id] = record_actions if query_rel_id not in self.surrogate_path\
                     else torch.cat((self.surrogate_path[query_rel_id], record_actions), 0)
             self.surrogate_path[query_rel_id] = self.surrogate_path[query_rel_id][-self.surrogate_path_limit:]
-        if torch.sum(sel_path_idx) > 0:
+        if False and torch.sum(sel_path_idx) > 0:
             record_action_embed = self.relation_emb(record_actions)
             #query_relation_embed = self.relation_emb(query_rels)
             query_relation_embed = self.query_relation_emb(query_rels)
@@ -280,7 +281,10 @@ class Agent(nn.Module):
                 else:
                     embed_dict[query_rels[i]] = [path_embed[i]]
             for rel in embed_dict:
-                relation_embed_t.data[rel] = torch.mean(torch.stack(embed_dict[rel]), 0)
+                if not_updated:
+                    relation_embed_t.data[rel] = torch.mean(torch.stack(embed_dict[rel]), 0)
+                else:
+                    relation_embed_t.data[rel] = relation_embed_t.data[rel] * 0.9 + 0.1*torch.mean(torch.stack(embed_dict[rel]), 0)
             return False
         return True
 
