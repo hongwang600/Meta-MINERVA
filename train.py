@@ -258,6 +258,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
     #task_results = np.zeros([num_meta_step+1, 6])
     task_results = None
+    sep_results = []
     for task in few_shot_data:
         new_results = single_task_meta_test(agent, args, few_shot_data[task],
                                               test_data[task], num_meta_step)
@@ -265,6 +266,7 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
             task_results = new_results
         else:
             task_results += new_results
+        sep_results.append(new_results)
     task_results /= len(few_shot_data)
     pre_str = 'meta_'
     for i in range(len(task_results)):
@@ -277,6 +279,13 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
         writer.add_scalar(pre_str+'Hits10', task_results[i][3], to_shown_idx)
         writer.add_scalar(pre_str+'Hits20', task_results[i][4], to_shown_idx)
         writer.add_scalar(pre_str+'AUC', task_results[i][5], to_shown_idx)
+    for task_id, task_results in enumerate(sep_results):
+        for i in range(len(task_results)):
+            to_shown_idx = i
+            if i > 10:
+                to_shown_idx = (i-10+1)*10
+            writer.add_scalar('task_'+str(task_id)+'_AUC', task_results[i][5], to_shown_idx)
+
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
