@@ -87,7 +87,7 @@ def train_one_episode(agent, episode, args, update_path_set=False):
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
 
-def update_rel_embed(agent, episode, args, reasoner=None, not_updated = True):
+def update_rel_embed(agent, episode, args, reasoner=None, not_updated = True, acc_path=False, update_embed=False):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -119,7 +119,7 @@ def update_rel_embed(agent, episode, args, reasoner=None, not_updated = True):
 
     rewards = episode.get_reward()
     #print(rewards.shape)
-    return agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels], reasoner = reasoner, not_updated =not_updated)
+    return agent.update_path_embed(rewards, args=args, record_path_rel=[record_actions, query_rels], reasoner = reasoner, not_updated =not_updated, acc_path=acc_path, update_embed=update_embed)
 
 def train(args):
     data = construct_data(args)
@@ -233,13 +233,14 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
         while update_embed:
         #while False:
             #not_updated = update_rel_embed(agent, episode, args, reasoner, not_updated)
-            update_embed = update_rel_embed(agent, episode, args, reasoner, not_updated)
+            update_embed = update_rel_embed(agent, episode, args, reasoner, not_updated, acc_path=True)
             if try_num >=20:
                 update_embed = False
                 #test_scores.append(test(agent, args, None, test_env))
                 break
             try_num += 1
         if agent.update_steps == 0:
+            update_rel_embed(agent, episode, args, reasoner, not_updated, update_embed=True)
             test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:

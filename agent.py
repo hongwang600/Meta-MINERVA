@@ -249,7 +249,7 @@ class Agent(nn.Module):
         for param_group in self.optim.param_groups:
             param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
 
-    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None, not_updated = True):
+    def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None, not_updated = True, update_embed=False, acc_path=False):
         if reasoner is None:
             reasoner = self.path_encoder
         record_actions, query_rels = record_path_rel
@@ -260,12 +260,14 @@ class Agent(nn.Module):
         record_actions = record_actions[sel_path_idx]
         query_rels = query_rels[sel_path_idx]
         embed_dict = {}
-        if torch.sum(sel_path_idx) > 0:
+        if acc_path and torch.sum(sel_path_idx) > 0:
             query_rel_id = int(query_rels[0])
             self.surrogate_path[query_rel_id] = record_actions if query_rel_id not in self.surrogate_path\
                     else torch.cat((self.surrogate_path[query_rel_id], record_actions), 0)
             self.surrogate_path[query_rel_id] = self.surrogate_path[query_rel_id][-self.surrogate_path_limit:]
-        if False and torch.sum(sel_path_idx) > 0:
+        if update_embed and torch.sum(sel_path_idx) > 0:
+            query_rel_id = int(query_rels[0])
+            record_actions = self.surrogate_path[query_rel_id]
             record_action_embed = self.relation_emb(record_actions)
             #query_relation_embed = self.relation_emb(query_rels)
             query_relation_embed = self.query_relation_emb(query_rels)
@@ -274,6 +276,8 @@ class Agent(nn.Module):
             else:
                 h = reasoner(record_action_embed)
             relation_embed_t = self.relation_emb.weight
+            relation_embed_t.data[query_rel_id] = torch.mean(h, 0)
+            '''
             path_embed =  h.view(query_relation_embed.size())
             for i in range(len(query_rels)):
                 if query_rels[i] in embed_dict:
@@ -285,6 +289,8 @@ class Agent(nn.Module):
                     relation_embed_t.data[rel] = torch.mean(torch.stack(embed_dict[rel]), 0)
                 else:
                     relation_embed_t.data[rel] = relation_embed_t.data[rel] * 0.9 + 0.1*torch.mean(torch.stack(embed_dict[rel]), 0)
+            '''
+            self.surrogate_path = []
             return False
         return True
 
@@ -306,7 +312,7 @@ class Agent(nn.Module):
         query_rels = query_rels[sel_path_idx]
         #self.record_path[0].append(record_actions)
         #self.record_path[1].append(query_rels)
-        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+        if False and self.use_path_encoder and torch.sum(sel_path_idx) > 0:
             query_rel_id = int(query_rels[0])
             self.surrogate_path[query_rel_id] = record_actions if query_rel_id not in self.surrogate_path\
                     else torch.cat((self.surrogate_path[query_rel_id], record_actions), 0)
