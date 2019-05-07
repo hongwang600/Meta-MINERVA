@@ -82,7 +82,7 @@ def train_one_episode(agent, episode, args, update_path_set=False, reasoner_only
         return batch_loss, avg_reward, success_rate
     else:
         rewards = episode.get_reward()
-    #print(rewards.shape)
+        #print(rewards.shape)
         batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args, record_path_rel=[record_actions, query_rels], reasoner_only=reasoner_only)
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
@@ -184,7 +184,7 @@ def train(args):
         if agent.update_steps % args['eval_every'] == 0:
             #agent.save_record_path(args['save_path']+'_record_path_')
             agent.save(args['save_path']+'_'+str(agent.update_steps))
-            test(agent, args, writer, dev_env)
+            #test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
             '''
             if agent.update_steps == 500:
@@ -307,10 +307,10 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     for episode in train_env.get_episodes():
         episode = episode[0]
         if agent.update_steps == 0:
-            for i in range(20):
-                update_rel_embed(agent, episode, args, acc_path=True)
+            #for i in range(20):
+            #    update_rel_embed(agent, episode, args, acc_path=True)
             test_scores.append(test(agent, args, None, test_env))
-        if try_num <=10:
+        if try_num <=5:
             train_one_episode(agent, episode, args, reasoner_only=True)
             #update_embed = update_rel_embed(agent, episode, args)
             #if update_embed:

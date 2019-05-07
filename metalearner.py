@@ -41,10 +41,13 @@ def compute_a_task_grad(agent, task_episode, args, i, only_path_encoder):
     #new_agent = Agent(args, cuda_id)
     #new_agent.cuda(cuda_id)
     new_agent = agent
+    new_agent.init_embed.load_state_dict(new_params)
+    '''
     if only_path_encoder:
         new_agent.path_encoder.load_state_dict(new_params)
     else:
         new_agent.load_state_dict(new_params)
+    '''
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
     #grad_params = new_agent.path_encoder.parameters() if only_path_encoder else new_agent.parameters()
     grad_params = new_agent.parameters()
