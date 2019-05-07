@@ -41,7 +41,7 @@ logfile = logging.FileHandler(args['log_path'], 'w')
 logfile.setFormatter(formatter)
 logger.addHandler(logfile)
 
-def train_one_episode(agent, episode, args, update_path_set=False):
+def train_one_episode(agent, episode, args, update_path_set=False, reasoner_only=False):
     query_rels = Variable(torch.from_numpy(episode.get_query_relation())).long().cuda()
     batch_size = query_rels.size()[0]
     state = episode.get_state()
@@ -83,7 +83,7 @@ def train_one_episode(agent, episode, args, update_path_set=False):
     else:
         rewards = episode.get_reward()
     #print(rewards.shape)
-        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args, record_path_rel=[record_actions, query_rels])
+        batch_loss, avg_reward = agent.update(rewards, record_action_probs, record_probs, decay_lr=True, args=args, record_path_rel=[record_actions, query_rels], reasoner_only=reasoner_only)
         success_rate = np.sum(rewards) / batch_size
         return batch_loss, avg_reward, success_rate
 
@@ -163,7 +163,7 @@ def train(args):
     for episode in train_env.get_episodes():
         #print('get episode')
         if agent.update_steps < 10000:
-            batch_loss = meta_step(agent, episode, optim, args)
+            batch_loss = meta_step(agent, episode, optim, args, True)
         else:
             batch_loss = meta_step(agent, episode, optim, args, True)
         #if agent.update_steps == 1000:
@@ -306,14 +306,18 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     try_num = 0
     for episode in train_env.get_episodes():
         episode = episode[0]
-        while try_num <=20:
-            update_embed = update_rel_embed(agent, episode, args)
+        if agent.update_steps == 0:
+            for i in range(20):
+                update_rel_embed(agent, episode, args, acc_path=True)
+            test_scores.append(test(agent, args, None, test_env))
+        if try_num <=10:
+            train_one_episode(agent, episode, args, reasoner_only=True)
+            #update_embed = update_rel_embed(agent, episode, args)
             #if update_embed:
             #    update_embed = False
-            try_num += 1
-        if agent.update_steps == 0:
-            test_scores.append(test(agent, args, None, test_env))
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
+        else:
+            train_one_episode(agent, episode, args)
+        try_num += 1
         if agent.update_steps % 2 == 0:
             test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == start_step+training_step:

@@ -142,13 +142,14 @@ class Agent(nn.Module):
         #self.path_encoder = None
         self.surrogate_path = {}
         self.seen_query_rels = []
-        self.surrogate_path_limit = 128
+        self.surrogate_path_limit = 16
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
         self.update_steps = 0
         if not use_sgd:
-            self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+            #self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
+            self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
         else:
             self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
 
@@ -211,8 +212,8 @@ class Agent(nn.Module):
         rel_id =  int(query_rel)
         if rel_id in self.surrogate_path:
             record_actions = self.surrogate_path[rel_id]
-            sel_idx = np.random.choice(list(range(len(record_actions))), 16)
-            #sel_idx = list(range(len(record_actions)))
+            #sel_idx = np.random.choice(list(range(len(record_actions))), 5)
+            sel_idx = list(range(len(record_actions)))
             record_actions = record_actions[sel_idx]
             record_action_embed = self.relation_emb(record_actions).detach()
             #record_action_embed = self.relation_emb(record_actions)
@@ -294,7 +295,7 @@ class Agent(nn.Module):
             return False
         return True
 
-    def update(self, rewards, record_action_probs, record_probs, record_path_rel, decay_lr=False, args=None):
+    def update(self, rewards, record_action_probs, record_probs, record_path_rel, decay_lr=False, args=None, reasoner_only=False):
         # discounted rewards
         if args['new_reward']:
             discounted_rewards = rewards.transpose()
@@ -359,10 +360,16 @@ class Agent(nn.Module):
         if False and embed_loss is not None:
             self.loss += 0.1*embed_loss
             print(embed_loss.data)
-        self.optim.zero_grad()
-        self.loss.backward()
-        nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
-        self.optim.step()
+        if reasoner_only:
+            reasoner_optim = optim.SGD(self.path_encoder.parameters(), lr=self.learning_rate)
+            reasoner_optim.zero_grad()
+            self.loss.backward()
+            reasoner_optim.step()
+        else:
+            self.optim.zero_grad()
+            self.loss.backward()
+            nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
+            self.optim.step()
         if decay_lr:
             self.decay_lr()
 

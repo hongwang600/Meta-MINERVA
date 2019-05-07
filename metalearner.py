@@ -46,7 +46,8 @@ def compute_a_task_grad(agent, task_episode, args, i, only_path_encoder):
     else:
         new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
-    grad_params = new_agent.path_encoder.parameters() if only_path_encoder else new_agent.parameters()
+    #grad_params = new_agent.path_encoder.parameters() if only_path_encoder else new_agent.parameters()
+    grad_params = new_agent.parameters()
     this_task_grad = torch.autograd.grad(new_loss, grad_params, allow_unused=True)
     this_task_loss = new_loss.item()
     #del new_agent
@@ -142,8 +143,10 @@ def meta_step(agent, episodes, optim, args, only_path_encoder=False):
     optim.zero_grad()
     for grads in task_grads:
         #print('old param')
-        grad_params = agent.path_encoder.named_parameters() if only_path_encoder \
-                else agent.named_parameters()
+        #grad_params = agent.path_encoder.named_parameters() if only_path_encoder \
+        #        else agent.named_parameters()
+        grad_params = agent.named_parameters()
+
         for (name, param), grad in zip(grad_params, grads):
             #print(param.data)
             #param.data -= args['alpha2']*grad
