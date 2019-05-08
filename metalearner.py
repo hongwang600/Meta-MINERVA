@@ -141,21 +141,12 @@ def meta_step(agent, episodes, optim, args):
     '''
     optim.zero_grad()
     for grads in task_grads:
-        #print('old param')
         for (name, param), grad in zip(agent.named_parameters(), grads):
-            #print(param.data)
-            #param.data -= args['alpha2']*grad
             if param.grad is not None:
-                param.grad += grad.cuda(0)
+                param.grad += grad
             else:
                 param.grad = grad
-        #print('new param')
-        #for (name, param), grad in zip(agent.named_parameters(), grads):
-            #print(param.data)
     nn.utils.clip_grad_norm(agent.parameters(), agent.grad_clip_norm)
-    #for (name, param) in agent.named_parameters()::
-    #    param.data -= args['alpha2']*param.grad
-    #    del param.grad
     optim.step()
     for grads in task_grads:
         for grad in grads:

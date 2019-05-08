@@ -198,12 +198,26 @@ class Agent(nn.Module):
 
     def query_relation_emb(self, relation_ids):
         rel_id = int(relation_ids[0])
-        head_neighbor, end_neighbor = self.store_neighbors[rel_id]
-        head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
-        end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
-        #print(head_embed.size())
-        diff_embed = end_embed - head_embed
-        return torch.mean(diff_embed, 0).expand(len(relation_ids), -1).contiguous()
+        if rel_id in self.store_neighbors:
+            head_neighbor, end_neighbor = self.store_neighbors[rel_id]
+            head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
+            end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
+            #print(head_embed.size())
+            diff_embed = end_embed - head_embed
+            return torch.mean(diff_embed, 0).expand(len(relation_ids), -1).contiguous()
+        else:
+            return self.relation_emb(relation_ids)
+
+    def init_query_rel_emb(self, rel_id):
+        if rel_id in self.store_neighbors:
+            head_neighbor, end_neighbor = self.store_neighbors[rel_id]
+            head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
+            end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
+            #print(head_embed.size())
+            diff_embed = end_embed - head_embed
+            rel_embed = torch.mean(diff_embed, 0)
+            self.relation_emb.weight.data[rel_id].copy_(rel_embed)
+            self.store_neighbors.pop(rel_id)
 
     def neighbor_encoder(self, connections, num_neighbors):
         '''
@@ -367,7 +381,7 @@ class Agent(nn.Module):
         #for (name, param), grad in zip(self.named_parameters(), grads):
         for (name, param) in self.named_parameters():
             updated_params[name] = param.clone()
-            print(name)
+            #print(name)
             if name.startswith('gcn') and param.grad is not None:
                 updated_params[name] -= step_size * param.grad
 
