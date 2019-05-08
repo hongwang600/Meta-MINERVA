@@ -367,7 +367,8 @@ class Agent(nn.Module):
         #for (name, param), grad in zip(self.named_parameters(), grads):
         for (name, param) in self.named_parameters():
             updated_params[name] = param.clone()
-            if param.grad is not None:
+            print(name)
+            if name.startswith('gcn') and param.grad is not None:
                 updated_params[name] -= step_size * param.grad
 
         return updated_params
