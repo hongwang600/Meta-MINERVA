@@ -127,7 +127,7 @@ class RelationEntityBatcher():
             for i in range(e1.shape[0]):
                 all_e2s.append(self.store_all_correct[(e1[i], r[i])])
             assert e1.shape[0] == e2.shape[0] == r.shape[0] == len(all_e2s)
-            yield e1, r, e2, all_e2s          
+            yield e1, r, e2, all_e2s
 
 
     def yield_next_batch_test(self):
@@ -229,8 +229,19 @@ class RelationEntityGrapher:
 
         return ret
 
-
-
+    def neighbor_entity(self, head_entity, end_entity):
+        ret = self.array_store[head_entity, :, :].copy()
+        num_neighbors = []
+        for i in range(head_entity.shape[0]):
+            relations = ret[i, :, 1] # all linked relations
+            entities = ret[i, :, 0]
+            mask = np.where(entities == end_entity[i]) # at the start point, mask out the direction link that can arrive at the answer
+            ret[i, :, 0][mask] = self.ePAD
+            ret[i, :, 1][mask] = self.rPAD
+            num_neighbors.append(np.sum(np.where(ret[i,:,0]!=self.ePAD)))
+            if num_neighbors[-1]==0:
+                num_neighbors[-1] = 1
+        return [ret, np.array(num_neighbors)]
 
 class Episode(object):
 
@@ -250,7 +261,7 @@ class Episode(object):
         self.positive_reward = positive_reward
         self.negative_reward = negative_reward
         start_entities = np.repeat(start_entities, self.num_rollouts) # shape (batch_size*num_rollouts,)
-        batch_query_relation = np.repeat(query_relation, self.num_rollouts) 
+        batch_query_relation = np.repeat(query_relation, self.num_rollouts)
         end_entities = np.repeat(end_entities, self.num_rollouts)
         self.start_entities = start_entities
         self.end_entities = end_entities
@@ -310,6 +321,11 @@ class Episode(object):
             acc_reward.append(reward)
             #print(reward.shape)
         return np.array(acc_reward)
+
+    def fetch_head_end_neighbor(self):
+        return [self.grapher.neighbor_entity(self.start_entities, self.end_entities),
+                self.grapher.neighbor_entity(self.end_entities, self.start_entities)]
+
 
     def __call__(self, action):
         self.current_hop += 1

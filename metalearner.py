@@ -32,24 +32,30 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #new_agent.cuda(cuda_id)
     #print('before loss')
     #print(cuda_id, 'pass')
-    this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
-    new_params = agent.update_params(this_task_loss,
-                                         args['alpha1'])
+    #this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
+    #new_params = agent.update_params(this_task_loss,
+    #                                     args['alpha1'])
     #del agent
     #del this_task_loss
     #del new_agent
     #new_agent = Agent(args, cuda_id)
     #new_agent.cuda(cuda_id)
     new_agent = agent
-    new_agent.load_state_dict(new_params)
+    neighbors = task_episode[0].fetch_head_end_neighbor()
+    query_id = int(task_episode[0].get_query_relation()[0])
+    #print(query_id)
+    agent.store_neighbors[query_id] = neighbors
+    #print(embed[0][0].shape, embed[0][1].shape)
+    #assert False
+    #new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
-    this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
+    this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters(), allow_unused=True)
     this_task_loss = new_loss.item()
     #del new_agent
     #print(task_grads[-1])
     del new_loss
     del new_agent
-    del new_params
+    #del new_params
     torch.cuda.empty_cache()
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:
@@ -116,7 +122,7 @@ def task_loss(agent, episode, args, cuda_id=0):
     return loss
 
 def meta_step(agent, episodes, optim, args):
-    """Meta-optimization step (ie. update of the initial parameters), based 
+    """Meta-optimization step (ie. update of the initial parameters), based
     on Trust Region Policy Optimization (TRPO, [4]).
     """
     #task_params = compute_new_params(agent, episodes, args)
@@ -142,7 +148,7 @@ def meta_step(agent, episodes, optim, args):
             if param.grad is not None:
                 param.grad += grad.cuda(0)
             else:
-                param.grad = grad.cuda(0)
+                param.grad = grad
         #print('new param')
         #for (name, param), grad in zip(agent.named_parameters(), grads):
             #print(param.data)

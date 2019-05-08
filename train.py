@@ -130,7 +130,7 @@ def train(args):
         #one_step_meta_test(agent, args, writer, train_data, dev_data)
         if agent.update_steps % args['eval_every'] == 0:
             agent.save(args['save_path']+'_'+str(agent.update_steps))
-            test(agent, args, writer, dev_env)
+            #test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
 
 
@@ -149,6 +149,11 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
+    seed_episode = next(train_env.get_episodes())
+    episode = seed_episode[0]
+    neighbors = episode.fetch_head_end_neighbor()
+    query_id = int(episode.get_query_relation()[0])
+    agent.store_neighbors[query_id] = neighbors
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]
@@ -204,6 +209,11 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
+    seed_episode = next(train_env.get_episodes())
+    episode = seed_episode[0]
+    neighbors = episode.fetch_head_end_neighbor()
+    query_id = int(episode.get_query_relation()[0])
+    agent.store_neighbors[query_id] = neighbors
     test_scores.append(test(agent, args, None, test_env))
     for episode in train_env.get_episodes():
         episode = episode[0]

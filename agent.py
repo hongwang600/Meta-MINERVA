@@ -143,6 +143,9 @@ class Agent(nn.Module):
         # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
         self.baseline = 0.0
+        self.store_neighbors={}
+        self.gcn = nn.Linear(self.embed_size*2, self.embed_size)
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents, params=None):
         """
@@ -159,8 +162,8 @@ class Agent(nn.Module):
         next_ent_emb = self.entity_emb(next_ents)
         action_emb = torch.cat((next_rel_emb, next_ent_emb), dim=2) # batch_size * action_num * 2d
 
-        #query_rel_emb = self.relation_emb(query_rels)
-        query_rel_emb = self.relation_emb(torch.zeros(query_rels.size()).long().cuda())
+        query_rel_emb = self.query_relation_emb(query_rels)
+        #query_rel_emb = self.query_relation_emb(torch.zeros(query_rels.size()).long().cuda())
         curr_ent_emb = self.entity_emb(curr_ents)
         pre_rel_emb = self.relation_emb(pre_rels)
 
@@ -192,6 +195,38 @@ class Agent(nn.Module):
         token_ids = pad_sequence(token_ids)
         #token_ids = self.token_vocab[tokenize_names]
         return token_ids.cuda(self.cuda_id), token_lengths.cuda(self.cuda_id)
+
+    def query_relation_emb(self, relation_ids):
+        rel_id = int(relation_ids[0])
+        head_neighbor, end_neighbor = self.store_neighbors[rel_id]
+        head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
+        end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
+        #print(head_embed.size())
+        diff_embed = end_embed - head_embed
+        return torch.mean(diff_embed, 0).expand(len(relation_ids), -1).contiguous()
+
+    def neighbor_encoder(self, connections, num_neighbors):
+        '''
+        connections: (batch, 200, 2)
+        num_neighbors: (batch,)
+        '''
+        connections = torch.from_numpy(connections).long().cuda()
+        num_neighbors = torch.from_numpy(num_neighbors).float().cuda()
+        num_neighbors = num_neighbors.unsqueeze(1)
+        entities = connections[:,:,0].squeeze(-1)
+        relations = connections[:,:,1].squeeze(-1)
+        rel_embeds = self.dropout(self.relation_emb(relations)) # (batch, 200, embed_dim)
+        ent_embeds = self.dropout(self.entity_emb(entities)) # (batch, 200, embed_dim)
+
+        concat_embeds = torch.cat((rel_embeds, ent_embeds), dim=-1) # (batch, 200, 2*embed_dim)
+
+        out = self.gcn(concat_embeds)
+
+        out = torch.sum(out, dim=1) # (batch, embed_dim)
+        #print(out.size())
+        #assert False
+        out = out / num_neighbors
+        return out.tanh()
 
     def _relation_emb(self, relation_ids):
         #print(relation_ids.size())
