@@ -23,9 +23,12 @@ def compute_new_params(agent, episodes, args):
                                                args['alpha1']))
     return task_params
 
-def compute_a_task_grad(agent, task_episode, args, i):
+def compute_a_task_grad(ori_agent, task_episode, args, i):
     cuda_id = i%4
-    origin_state = agent.state_dict()
+    origin_state = ori_agent.state_dict()
+    agent = Agent(args)
+    agent.cuda()
+    agent.load_state_dict(origin_state)
     #cuda_id = 0
     #new_agent = Agent(args, cuda_id)
     #new_agent.load_state_dict(agent.state_dict())
@@ -35,10 +38,14 @@ def compute_a_task_grad(agent, task_episode, args, i):
     neighbors = task_episode[0].fetch_head_end_neighbor()
     query_id = int(task_episode[0].get_query_relation()[0])
     #print(query_id)
+    #if query_id not in agent.store_neighbors:
     agent.store_neighbors[query_id] = neighbors
-    this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
-    new_params = agent.update_params(this_task_loss,
-                                         args['alpha1'])
+    #elif np.random.rand() < 0.1:
+    #    agent.store_neighbors[query_id] = neighbors
+    for i in range(1):
+        this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
+        agent.update_params(this_task_loss, args['alpha1'])
+        #agent.load_state_dict(new_params)
     #del agent
     #del this_task_loss
     #del new_agent
@@ -47,7 +54,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     new_agent = agent
     #print(embed[0][0].shape, embed[0][1].shape)
     #assert False
-    new_agent.load_state_dict(new_params)
+    #new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
     this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters(), allow_unused=True)
     this_task_loss = new_loss.item()
@@ -55,7 +62,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #print(task_grads[-1])
     del new_loss
     del new_agent
-    del new_params
+    #del new_params
     torch.cuda.empty_cache()
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:

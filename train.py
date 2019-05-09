@@ -158,7 +158,7 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     #loss = task_loss(agent, episode, args)
     #new_params = agent.update_params(loss, args['alpha1'])
     #agent.load_state_dict(new_params)
-    agent.init_query_rel_emb(query_id)
+    #agent.init_query_rel_emb(query_id)
     for episode in train_env.get_episodes():
         episode = episode[0]
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
@@ -219,9 +219,9 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     query_id = int(episode.get_query_relation()[0])
     agent.store_neighbors[query_id] = neighbors
     test_scores.append(test(agent, args, None, test_env))
-    loss = task_loss(agent, episode, args)
-    new_params = agent.update_params(loss, args['alpha1'])
-    agent.load_state_dict(new_params)
+    #loss = task_loss(agent, episode, args)
+    #new_params = agent.update_params(loss, args['alpha1'])
+    #agent.load_state_dict(new_params)
     for episode in train_env.get_episodes():
         episode = episode[0]
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)

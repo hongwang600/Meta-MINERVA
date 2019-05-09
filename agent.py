@@ -133,6 +133,7 @@ class Agent(nn.Module):
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
+        self.gcn = nn.Linear(self.embed_size*2, self.embed_size)
 
         self.update_steps = 0
         if not use_sgd:
@@ -144,7 +145,7 @@ class Agent(nn.Module):
 
         self.baseline = 0.0
         self.store_neighbors={}
-        self.gcn = nn.Linear(self.embed_size*2, self.embed_size)
+        self.pair_encoder = nn.Linear(self.embed_size*2, self.embed_size)
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents, params=None):
@@ -203,8 +204,10 @@ class Agent(nn.Module):
             head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
             end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
             #print(head_embed.size())
-            diff_embed = end_embed - head_embed
-            return torch.mean(diff_embed, 0).expand(len(relation_ids), -1).contiguous()
+            pair_embeds = end_embed - head_embed
+            #concat_embeds = torch.cat((head_embed, end_embed), dim=-1) # (batch, 200, 2*embed_dim)
+            #pair_embeds = self.pair_encoder(concat_embeds)
+            return torch.mean(pair_embeds, 0).expand(len(relation_ids), -1).contiguous()
         else:
             return self.relation_emb(relation_ids)
 
@@ -375,14 +378,17 @@ class Agent(nn.Module):
         self.optim.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
-        updated_params = OrderedDict()
+        #updated_params = OrderedDict()
         #self.relation_emb.zero_grad()
         #self.entity_emb.zero_grad()
         #for (name, param), grad in zip(self.named_parameters(), grads):
-        for (name, param) in self.named_parameters():
-            updated_params[name] = param.clone()
+        #for (name, param) in self.named_parameters():
+        #    updated_params[name] = param.clone()
             #print(name)
-            if name.startswith('gcn') and param.grad is not None:
-                updated_params[name] -= step_size * param.grad
-
-        return updated_params
+            #if name.startswith('gcn') and param.grad is not None:
+        #    if param.grad is not None:
+        #        updated_params[name] -= step_size * param.grad
+        #del loss
+        self.optim.step()
+        #updated_params = self.state_dict()
+        #return updated_params
