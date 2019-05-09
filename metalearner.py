@@ -25,22 +25,23 @@ def compute_new_params(agent, episodes, args):
 
 def compute_a_task_grad(ori_agent, task_episode, args, i):
     cuda_id = i%4
-    origin_state = agent.state_dict()
+    origin_state = ori_agent.state_dict()
     #cuda_id = 0
-    #new_agent = Agent(args, cuda_id)
-    #new_agent.load_state_dict(agent.state_dict())
+    agent = Agent(args, cuda_id).cuda()
+    agent.load_state_dict(origin_state)
     #new_agent.cuda(cuda_id)
     #print('before loss')
     #print(cuda_id, 'pass')
-    this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
-    agent.update_params(this_task_loss, args['alpha1'])
+    for step_i in range(5):
+        this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
+        agent.update_params(this_task_loss, args['alpha1'])
     #del agent
     #del this_task_loss
     #del new_agent
     #new_agent = Agent(args, cuda_id)
     #new_agent.cuda(cuda_id)
     new_agent = agent
-    new_agent.load_state_dict(new_params)
+    #new_agent.load_state_dict(new_params)
     new_loss = task_loss(new_agent, task_episode[1], args, cuda_id)
     this_task_grad = torch.autograd.grad(new_loss, new_agent.parameters())
     this_task_loss = new_loss.item()
@@ -48,7 +49,7 @@ def compute_a_task_grad(ori_agent, task_episode, args, i):
     #print(task_grads[-1])
     del new_loss
     del new_agent
-    del new_params
+    #del new_params
     torch.cuda.empty_cache()
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:
