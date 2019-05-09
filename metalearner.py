@@ -67,7 +67,7 @@ def compute_a_task_grad(ori_agent, task_episode, args, i):
     #print(this_task_grad, this_task_loss)
     #for grad in this_task_grad:
     #    grad.cuda(0)
-    agent.load_state_dict(origin_state)
+    #agent.load_state_dict(origin_state)
     return this_task_grad, this_task_loss
 
 def compute_tasks_grad(agent, episodes, args, i):
