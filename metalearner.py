@@ -23,7 +23,7 @@ def compute_new_params(agent, episodes, args):
                                                args['alpha1']))
     return task_params
 
-def compute_a_task_grad(agent, task_episode, args, i):
+def compute_a_task_grad(ori_agent, task_episode, args, i):
     cuda_id = i%4
     origin_state = agent.state_dict()
     #cuda_id = 0
@@ -33,8 +33,7 @@ def compute_a_task_grad(agent, task_episode, args, i):
     #print('before loss')
     #print(cuda_id, 'pass')
     this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
-    new_params = agent.update_params(this_task_loss,
-                                         args['alpha1'])
+    agent.update_params(this_task_loss, args['alpha1'])
     #del agent
     #del this_task_loss
     #del new_agent
@@ -116,7 +115,7 @@ def task_loss(agent, episode, args, cuda_id=0):
     return loss
 
 def meta_step(agent, episodes, optim, args):
-    """Meta-optimization step (ie. update of the initial parameters), based 
+    """Meta-optimization step (ie. update of the initial parameters), based
     on Trust Region Policy Optimization (TRPO, [4]).
     """
     #task_params = compute_new_params(agent, episodes, args)
