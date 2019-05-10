@@ -35,7 +35,7 @@ def compute_a_task_grad(ori_agent, task_episode, args, i, only_path_encoder):
     #task_episode[0].get_all_succ_path()
     query_id = int(task_episode[0].get_query_relation()[0])
     agent.surrogate_path[query_id] = task_episode[0].get_all_succ_path()
-    for i in range(1):
+    for i in range(5):
         this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
         agent.update_params(this_task_loss, args['alpha1'])
     #del agent

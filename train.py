@@ -218,14 +218,17 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     agent.update_steps = 0
     #print(len(few_shot_data), len(test_data))
     #train_env = env(args, mode='train', batcher_triples=[few_shot_data], extra_rollout=True)
+    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
+    lead_episode = next(train_env.get_episodes())[0]
+    query_id = int(lead_episode.get_query_relation()[0])
+    agent.surrogate_path[query_id] = lead_episode.get_all_succ_path()
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
     #for try_num in range(50):
     #    update_rel_embed(agent, episode, args, reasoner)
     #test_scores.append(test(agent, args, None, test_env))
-    train_env = env(args, mode='train', batcher_triples=[few_shot_data])
-    update_embed = True
+    update_embed = False
     try_num = 0
     not_updated = True
     for episode in train_env.get_episodes():
@@ -239,12 +242,12 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
                 #test_scores.append(test(agent, args, None, test_env))
                 break
             try_num += 1
-        if agent.update_steps == 0:
-            update_rel_embed(agent, episode, args, reasoner, not_updated, update_embed=True)
-            test_scores.append(test(agent, args, None, test_env))
+        #if agent.update_steps == 0:
+            #update_rel_embed(agent, episode, args, reasoner, not_updated, update_embed=True)
+        #    test_scores.append(test(agent, args, None, test_env))
         batch_loss, avg_reward, success_rate = train_one_episode(agent, episode, args)
         #if agent.update_steps % args['eval_every'] == 0:
-        if agent.update_steps < 9 or agent.update_steps%10==0:
+        if agent.update_steps < 10 or agent.update_steps%10==0:
             test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == training_step:
             break
