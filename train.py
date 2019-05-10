@@ -184,7 +184,7 @@ def train(args):
         if agent.update_steps % args['eval_every'] == 0:
             #agent.save_record_path(args['save_path']+'_record_path_')
             agent.save(args['save_path']+'_'+str(agent.update_steps))
-            test(agent, args, writer, dev_env)
+            #test(agent, args, writer, dev_env)
             one_step_meta_test(agent, args, writer, few_shot_dev_data, meta_dev_data)
             '''
             if agent.update_steps == 500:
@@ -300,6 +300,10 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     #print(len(few_shot_data), len(test_data))
     train_env = env(args, mode='train', batcher_triples=[few_shot_data])
     test_env = env(args, mode='dev', batcher_triples=test_data)
+    lead_episode = next(train_env.get_episodes())[0]
+    query_id = int(lead_episode.get_query_relation()[0])
+    print(query_id)
+    agent.surrogate_path[query_id] = lead_episode.get_all_succ_path()
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
     update_embed = True
@@ -307,16 +311,8 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     for episode in train_env.get_episodes():
         episode = episode[0]
         if agent.update_steps == 0:
-            for i in range(20):
-                update_rel_embed(agent, episode, args, acc_path=True)
             test_scores.append(test(agent, args, None, test_env))
-        if try_num <=10:
-            train_one_episode(agent, episode, args, reasoner_only=True)
-            #update_embed = update_rel_embed(agent, episode, args)
-            #if update_embed:
-            #    update_embed = False
-        else:
-            train_one_episode(agent, episode, args)
+        train_one_episode(agent, episode, args)
         try_num += 1
         if agent.update_steps % 2 == 0:
             test_scores.append(test(agent, args, None, test_env))

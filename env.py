@@ -193,6 +193,9 @@ class RelationEntityGrapher:
                 e2 = self.entity_vocab[line[2]]
                 self.store[e1].append((r, e2)) # store record the out links for each entity
 
+        self.array_store[:, 0, 1] = self.relation_vocab['NO_OP']
+        self.array_store[:, 0, 0] = range(len(self.array_store))
+
         for e1 in self.store:
             num_actions = 1
             self.array_store[e1, 0, 1] = self.relation_vocab['NO_OP']
@@ -228,6 +231,18 @@ class RelationEntityGrapher:
                         relations[j] = self.rPAD
 
         return ret
+    def search_next_actions(self, current_entities, start_entities, query_relations, answers):
+
+        ret = self.array_store[current_entities, :, :].copy() # (batch*num_rollouts, 250, 2)
+        for i in range(len(current_entities)):
+            if current_entities[i] == start_entities[i]: # at the start point
+                relations = ret[i, :, 1] # all linked relations
+                entities = ret[i, :, 0]
+                mask = np.logical_and(relations == query_relations[i] , entities == answers[i]) # at the start point, mask out the direction link that can arrive at the answer
+                ret[i, :, 0][mask] = self.ePAD
+                ret[i, :, 1][mask] = self.rPAD
+
+        return ret
 
 
 
@@ -238,7 +253,7 @@ class Episode(object):
         self.grapher = graph
         self.batch_size, self.path_len, num_rollouts, test_rollouts, positive_reward, negative_reward, mode, batcher = params
         if extra_rollout:
-            num_rollouts *= 50
+            num_rollouts *= 1
         self.mode = mode
         if self.mode == 'train':
             self.num_rollouts = num_rollouts
@@ -268,6 +283,50 @@ class Episode(object):
         self.state['next_entities'] = next_actions[:, :, 0]
         self.state['current_entities'] = self.current_entities
         self.past_entities = []
+
+    def all_succ_path_for_entity(self, start_entity, end_entity, query_relation):
+        start_entity = start_entity.reshape(1)
+        end_entity = end_entity.reshape(1)
+        query_relation = query_relation.reshape(1)
+        num_step = self.path_len
+        cur_entity = start_entity
+        past_steps = []
+        for i in range(num_step):
+            next_actions = self.grapher.search_next_actions(cur_entity, start_entity, query_relation, end_entity)
+            num_action = next_actions.shape[1]
+            next_entity = next_actions[:,:,0].flatten()
+            next_relation = next_actions[:,:,1].flatten()
+            #cur_entity = cur_entity.repeat(num_action)
+            #print(next_relation[:5], next_entity[:5])
+            sel_rel_idx = np.where(next_relation!=self.grapher.ePAD)
+            #print(next_entity.shape, sel_rel_idx)
+            for i, _ in enumerate(past_steps):
+                #print(sel_rel_idx)
+                past_steps[i] = _.repeat(num_action)[sel_rel_idx]
+            past_steps.append(next_relation[sel_rel_idx].copy())
+            cur_entity = next_entity[sel_rel_idx]
+            start_entity = start_entity[0].repeat(len(cur_entity))
+            end_entity = end_entity[0].repeat(len(cur_entity))
+            query_relation = query_relation[0].repeat(len(cur_entity))
+
+            #print(cur_entity[:10], cur_entity.shape)
+        #print(past_steps)
+        all_path = np.stack(past_steps, 1)
+        return all_path[np.where(cur_entity==end_entity[0])]
+
+
+    def get_all_succ_path(self):
+        num_rollout = self.num_rollouts
+        start_entity = self.start_entities[::num_rollout]
+        end_entity = self.end_entities[::num_rollout]
+        query_relation = self.query_relation[::num_rollout]
+        #print(start_entity, end_entity)
+        all_succ_path = []
+        for i in range(len(start_entity)):
+            all_succ_path.append(self.all_succ_path_for_entity(start_entity[i], end_entity[i], query_relation[i]))
+        return np.concatenate(all_succ_path, 0)
+
+
 
     def get_all_answers(self):
         return self.all_answers

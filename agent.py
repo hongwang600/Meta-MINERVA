@@ -137,19 +137,19 @@ class Agent(nn.Module):
             else:
                 self.rnns.append(nn.LSTMCell(self.hidden_size, self.hidden_size).cuda(self.cuda_id))
         # self.hidden_1 = nn.Linear(self.hidden_size + 2*self.embed_size, 4*self.hidden_size)
-        #self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
-        self.path_encoder = SimpleEncoder(self.embed_size, 2, 2)
+        self.path_encoder = nn.LSTM(self.embed_size, self.embed_size, batch_first=True)
+        #self.path_encoder = SimpleEncoder(self.embed_size, 2, 2)
         #self.path_encoder = None
         self.surrogate_path = {}
         self.seen_query_rels = []
-        self.surrogate_path_limit = 16
+        self.surrogate_path_limit = 256
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
 
         self.update_steps = 0
         if not use_sgd:
             #self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
-            self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
+            self.optim = optim.Adam(self.parameters(), lr=self.learning_rate)
         else:
             self.optim = optim.SGD(self.parameters(), lr=self.learning_rate)
 
@@ -210,15 +210,15 @@ class Agent(nn.Module):
     def query_relation_emb(self, relation_ids):
         query_rel = relation_ids[0]
         rel_id =  int(query_rel)
-        if rel_id in self.surrogate_path:
-            record_actions = self.surrogate_path[rel_id]
+        if len(self.surrogate_path[rel_id]) > 0:
+            record_actions = torch.from_numpy(self.surrogate_path[rel_id]).long().cuda()
             #sel_idx = np.random.choice(list(range(len(record_actions))), 5)
             sel_idx = list(range(len(record_actions)))
             record_actions = record_actions[sel_idx]
-            record_action_embed = self.relation_emb(record_actions).detach()
+            record_action_embed = self.relation_emb(record_actions)
             #record_action_embed = self.relation_emb(record_actions)
-            #output, (h, c) = self.path_encoder(record_action_embed)
-            h = self.path_encoder(record_action_embed)
+            output, (h, c) = self.path_encoder(record_action_embed)
+            #h = self.path_encoder(record_action_embed)
             h = h.view(len(record_actions), -1)
             query_rel_embed = torch.mean(h, 0)
         else:
@@ -422,7 +422,7 @@ class Agent(nn.Module):
         query_rels = query_rels[sel_path_idx]
         #self.record_path[0].append(record_actions)
         #self.record_path[1].append(query_rels)
-        if self.use_path_encoder and torch.sum(sel_path_idx) > 0:
+        if False and self.use_path_encoder and torch.sum(sel_path_idx) > 0:
             query_rel_id = int(query_rels[0])
             self.surrogate_path[query_rel_id] = record_actions if query_rel_id not in self.surrogate_path\
                     else torch.cat((self.surrogate_path[query_rel_id], record_actions), 0)
@@ -493,6 +493,8 @@ class Agent(nn.Module):
         self.optim.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(self.parameters(), self.grad_clip_norm)
+        self.optim.step()
+        '''
         updated_params = self.path_encoder.state_dict() if only_path_encoder else self.state_dict()
         #for (name, param), grad in zip(self.named_parameters(), grads):
         grad_params = self.path_encoder.named_parameters() if only_path_encoder else self.named_parameters()
@@ -502,6 +504,7 @@ class Agent(nn.Module):
                 updated_params[name] -= step_size * param.grad
 
         return updated_params
+        '''
 
     def train_path_reasoner(self):
         record_actions = torch.cat(self.record_path[0], 0)
