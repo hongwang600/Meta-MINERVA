@@ -25,12 +25,8 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
-<<<<<<< HEAD
-from metalearner import meta_step
 from attention import SimpleEncoder
-=======
 from metalearner import meta_step, task_loss
->>>>>>> neighbor_enc
 
 # read parameters
 args = read_options()

@@ -225,7 +225,7 @@ class Agent(nn.Module):
             output, (h, c) = self.path_encoder(record_action_embed)
             #h = self.path_encoder(record_action_embed)
             h = h.view(len(record_actions), -1)
-            query_rel_embed = torch.mean(h, 0)
+            query_rel_embed = torch.mean(h, 0).tanh()
             path_embed =  query_rel_embed.view(1,-1).expand(len(relation_ids), -1).contiguous()
         else:
             path_embed =  self.relation_emb(relation_ids)
@@ -279,7 +279,6 @@ class Agent(nn.Module):
         #assert False
         out = out / num_neighbors
         return out.tanh()
->>>>>>> neighbor_enc
 
     def _relation_emb(self, relation_ids):
         #print(relation_ids.size())
