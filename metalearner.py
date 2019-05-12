@@ -35,6 +35,9 @@ def compute_a_task_grad(ori_agent, task_episode, args, i, only_path_encoder):
     #task_episode[0].get_all_succ_path()
     query_id = int(task_episode[0].get_query_relation()[0])
     agent.surrogate_path[query_id] = task_episode[0].get_all_succ_path()
+    neighbors = task_episode[0].fetch_head_end_neighbor()
+    query_id = int(task_episode[0].get_query_relation()[0])
+    agent.store_neighbors[query_id] = neighbors
     for i in range(5):
         this_task_loss=task_loss(agent, task_episode[0], args, cuda_id)
         agent.update_params(this_task_loss, args['alpha1'])
@@ -141,26 +144,13 @@ def meta_step(agent, episodes, optim, args, only_path_encoder=False):
     '''
     optim.zero_grad()
     for grads in task_grads:
-        #print('old param')
-        #grad_params = agent.path_encoder.named_parameters() if only_path_encoder \
-        #        else agent.named_parameters()
-        grad_params = agent.named_parameters()
-
-        for (name, param), grad in zip(grad_params, grads):
-            #print(param.data)
-            #param.data -= args['alpha2']*grad
+        for (name, param), grad in zip(agent.named_parameters(), grads):
             if param.grad is not None:
                 if grad is not None:
                     param.grad += grad
             else:
                 param.grad = grad
-        #print('new param')
-        #for (name, param), grad in zip(agent.named_parameters(), grads):
-            #print(param.data)
     nn.utils.clip_grad_norm(agent.parameters(), agent.grad_clip_norm)
-    #for (name, param) in agent.named_parameters()::
-    #    param.data -= args['alpha2']*param.grad
-    #    del param.grad
     optim.step()
     for grads in task_grads:
         for grad in grads:

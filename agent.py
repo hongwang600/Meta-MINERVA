@@ -145,6 +145,7 @@ class Agent(nn.Module):
         self.surrogate_path_limit = 256
         self.hidden_1 = nn.Linear(self.hidden_size + 3*self.embed_size, 4*self.hidden_size)
         self.hidden_2 = nn.Linear(4*self.hidden_size, 2*self.embed_size)
+        self.gcn = nn.Linear(self.embed_size*2, self.embed_size)
 
         self.update_steps = 0
         if not use_sgd:
@@ -156,6 +157,9 @@ class Agent(nn.Module):
         # self.optim = YFOptimizer(self.parameters(), lr=self.learning_rate)
 
         self.baseline = 0.0
+        self.store_neighbors={}
+        self.pair_encoder = nn.Linear(self.embed_size*2, self.embed_size)
+        self.dropout = nn.Dropout(0.5)
 
     def forward(self, next_rels, next_ents, pre_states, pre_rels, query_rels, curr_ents, params=None):
         """
@@ -173,6 +177,7 @@ class Agent(nn.Module):
         action_emb = torch.cat((next_rel_emb, next_ent_emb), dim=2) # batch_size * action_num * 2d
 
         query_rel_emb = self.query_relation_emb(query_rels)
+        #query_rel_emb = self.query_relation_emb(torch.zeros(query_rels.size()).long().cuda())
         curr_ent_emb = self.entity_emb(curr_ents)
         pre_rel_emb = self.relation_emb(pre_rels)
 
@@ -221,12 +226,60 @@ class Agent(nn.Module):
             #h = self.path_encoder(record_action_embed)
             h = h.view(len(record_actions), -1)
             query_rel_embed = torch.mean(h, 0)
+            path_embed =  query_rel_embed.view(1,-1).expand(len(relation_ids), -1).contiguous()
         else:
-            return self.relation_emb(relation_ids)
-            query_rel_embed = self.relation_emb(query_rel)
+            path_embed =  self.relation_emb(relation_ids)
+            #query_rel_embed = self.relation_emb(query_rel)
         #print(query_rel_embed.size())
-        return query_rel_embed.view(1,-1).expand(len(relation_ids), -1).contiguous()
 
+        rel_id = int(relation_ids[0])
+        if rel_id in self.store_neighbors:
+            head_neighbor, end_neighbor = self.store_neighbors[rel_id]
+            head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
+            end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
+            #print(head_embed.size())
+            pair_embeds = end_embed - head_embed
+            #concat_embeds = torch.cat((head_embed, end_embed), dim=-1) # (batch, 200, 2*embed_dim)
+            #pair_embeds = self.pair_encoder(concat_embeds)
+            neighbor_embed =  torch.mean(pair_embeds, 0).expand(len(relation_ids), -1).contiguous()
+        else:
+            neighbor_embed = self.relation_emb(relation_ids)
+        return (path_embed + neighbor_embed)/2
+
+    def init_query_rel_emb(self, rel_id):
+        if rel_id in self.store_neighbors:
+            head_neighbor, end_neighbor = self.store_neighbors[rel_id]
+            head_embed = self.neighbor_encoder(head_neighbor[0], head_neighbor[1])
+            end_embed = self.neighbor_encoder(end_neighbor[0], end_neighbor[1])
+            #print(head_embed.size())
+            diff_embed = end_embed - head_embed
+            rel_embed = torch.mean(diff_embed, 0)
+            self.relation_emb.weight.data[rel_id].copy_(rel_embed)
+            self.store_neighbors.pop(rel_id)
+
+    def neighbor_encoder(self, connections, num_neighbors):
+        '''
+        connections: (batch, 200, 2)
+        num_neighbors: (batch,)
+        '''
+        connections = torch.from_numpy(connections).long().cuda()
+        num_neighbors = torch.from_numpy(num_neighbors).float().cuda()
+        num_neighbors = num_neighbors.unsqueeze(1)
+        entities = connections[:,:,0].squeeze(-1)
+        relations = connections[:,:,1].squeeze(-1)
+        rel_embeds = self.dropout(self.relation_emb(relations)) # (batch, 200, embed_dim)
+        ent_embeds = self.dropout(self.entity_emb(entities)) # (batch, 200, embed_dim)
+
+        concat_embeds = torch.cat((rel_embeds, ent_embeds), dim=-1) # (batch, 200, 2*embed_dim)
+
+        out = self.gcn(concat_embeds)
+
+        out = torch.sum(out, dim=1) # (batch, embed_dim)
+        #print(out.size())
+        #assert False
+        out = out / num_neighbors
+        return out.tanh()
+>>>>>>> neighbor_enc
 
     def _relation_emb(self, relation_ids):
         #print(relation_ids.size())
@@ -248,7 +301,7 @@ class Agent(nn.Module):
 
     def decay_lr(self):
         for param_group in self.optim.param_groups:
-            param_group['lr'] = max(self.alpha2, param_group['lr']*0.01)
+            param_group['lr'] = max(self.alpha2, param_group['lr']*0.1)
 
     def update_path_embed(self, rewards, record_path_rel, args=None, is_lstm=False, reasoner=None, not_updated = True, update_embed=False, acc_path=False):
         if reasoner is None:

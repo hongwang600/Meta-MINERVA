@@ -59,6 +59,7 @@ class RelationEntityBatcher():
             #with open(input_file) as raw_input_file:
                 #csv_file = csv.reader(raw_input_file, delimiter = '\t' )
                 #for line in csv_file:
+            self.batch_size = max(120, self.batch_size)
             for line in batcher_triples:
                 e1 = line[0]
                 r = line[1]
@@ -244,8 +245,19 @@ class RelationEntityGrapher:
 
         return ret
 
-
-
+    def neighbor_entity(self, head_entity, end_entity):
+        ret = self.array_store[head_entity, :, :].copy()
+        num_neighbors = []
+        for i in range(head_entity.shape[0]):
+            relations = ret[i, :, 1] # all linked relations
+            entities = ret[i, :, 0]
+            mask = np.where(entities == end_entity[i]) # at the start point, mask out the direction link that can arrive at the answer
+            ret[i, :, 0][mask] = self.ePAD
+            ret[i, :, 1][mask] = self.rPAD
+            num_neighbors.append(np.sum(np.where(ret[i,:,0]!=self.ePAD)))
+            if num_neighbors[-1]==0:
+                num_neighbors[-1] = 1
+        return [ret, np.array(num_neighbors)]
 
 class Episode(object):
 
@@ -369,6 +381,11 @@ class Episode(object):
             acc_reward.append(reward)
             #print(reward.shape)
         return np.array(acc_reward)
+
+    def fetch_head_end_neighbor(self):
+        return [self.grapher.neighbor_entity(self.start_entities, self.end_entities),
+                self.grapher.neighbor_entity(self.end_entities, self.start_entities)]
+
 
     def __call__(self, action):
         self.current_hop += 1

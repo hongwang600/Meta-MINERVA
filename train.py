@@ -25,8 +25,12 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
+<<<<<<< HEAD
 from metalearner import meta_step
 from attention import SimpleEncoder
+=======
+from metalearner import meta_step, task_loss
+>>>>>>> neighbor_enc
 
 # read parameters
 args = read_options()
@@ -152,8 +156,7 @@ def train(args):
 
     # build the agent here
     agent = Agent(args)
-    #agent.load(args['save_path'][:-6])
-    #agent.set_path_encoder()
+    agent.cuda()
     optim = torch.optim.Adam(agent.parameters(), lr=args['alpha2'])
     agent.cuda()
     #print(OrderedDict(agent.named_parameters()))
@@ -224,13 +227,19 @@ def single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_st
     query_id = int(lead_episode.get_query_relation()[0])
     agent.surrogate_path[query_id] = lead_episode.get_all_succ_path()
     test_scores = []
+    seed_episode = next(train_env.get_episodes())
+    episode = seed_episode[0]
+    neighbors = episode.fetch_head_end_neighbor()
+    query_id = int(episode.get_query_relation()[0])
+    agent.store_neighbors[query_id] = neighbors
     test_scores.append(test(agent, args, None, test_env))
-    #for try_num in range(50):
-    #    update_rel_embed(agent, episode, args, reasoner)
-    #test_scores.append(test(agent, args, None, test_env))
     update_embed = False
     try_num = 0
     not_updated = True
+    #loss = task_loss(agent, episode, args)
+    #new_params = agent.update_params(loss, args['alpha1'])
+    #agent.load_state_dict(new_params)
+    #agent.init_query_rel_emb(query_id)
     for episode in train_env.get_episodes():
         episode = episode[0]
         while update_embed:
@@ -289,7 +298,6 @@ def meta_test(agent, args, writer, few_shot_data, test_data):
             if i > 10:
                 to_shown_idx = (i-10+1)*10
             writer.add_scalar('task_'+str(task_id)+'_AUC', task_results[i][5], to_shown_idx)
-
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
@@ -308,13 +316,19 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     print(query_id)
     agent.surrogate_path[query_id] = lead_episode.get_all_succ_path()
     test_scores = []
+    seed_episode = next(train_env.get_episodes())
+    episode = seed_episode[0]
+    neighbors = episode.fetch_head_end_neighbor()
+    query_id = int(episode.get_query_relation()[0])
+    agent.store_neighbors[query_id] = neighbors
     test_scores.append(test(agent, args, None, test_env))
     update_embed = True
     try_num = 0
+    #loss = task_loss(agent, episode, args)
+    #new_params = agent.update_params(loss, args['alpha1'])
+    #agent.load_state_dict(new_params)
     for episode in train_env.get_episodes():
         episode = episode[0]
-        if agent.update_steps == 0:
-            test_scores.append(test(agent, args, None, test_env))
         train_one_episode(agent, episode, args)
         try_num += 1
         if agent.update_steps % 2 == 0:
@@ -327,7 +341,8 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
 def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
     num_meta_step = args['meta_step']
     run_steps = 10
-    task_results = np.zeros([int(run_steps/2)+2, 6])
+    #task_results = np.zeros([int(run_steps/2)+1, 6])
+    task_results = []
     task_names = list(few_shot_data.keys())
     random.shuffle(task_names)
     for task in task_names:
@@ -335,9 +350,11 @@ def one_step_meta_test(agent, args, writer, few_shot_data, test_data):
         few_shot_dev = test_data[task][:200]
         #random.shuffle(few_shot_train)
         #random.shuffle(few_shot_dev)
-        task_results += one_step_single_task_meta_test(agent, args, few_shot_train,
-                few_shot_dev, run_steps)
-    task_results /= len(task_names)
+        task_results.append(one_step_single_task_meta_test(agent, args, few_shot_train,
+                few_shot_dev, run_steps))
+    task_results = np.stack(task_results)
+    #task_results = np.median(task_results, 0)
+    task_results = np.mean(task_results, 0)
     pre_str = 'meta_one_step_'
     for i in range(len(task_results)):
         writer.add_scalar(pre_str+'Hits1', task_results[i][0], agent.update_steps+i)
