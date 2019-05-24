@@ -24,7 +24,7 @@ from env import RelationEntityBatcher, RelationEntityGrapher, env
 from options import read_options
 from agent import Agent
 from data import construct_data, concat_data, get_id_relation, build_vocab
- 
+
 # read parameters
 args = read_options()
 # logging
@@ -159,9 +159,10 @@ def abandoned_meta_test(agent, args, writer, few_shot_data, test_data):
     writer.close()
 
 def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, training_step):
-    agent = Agent(args)
-    agent.cuda()
-    agent.load_state_dict(ori_agent.state_dict())
+    #agent = Agent(args)
+    #agent.cuda()
+    #agent.load_state_dict(ori_agent.state_dict())
+    agent = ori_agent
     #print(agent.update_steps)
     start_step = agent.update_steps
     #agent.update_steps = 0
@@ -170,13 +171,15 @@ def one_step_single_task_meta_test(ori_agent, args, few_shot_data, test_data, tr
     test_env = env(args, mode='dev', batcher_triples=test_data)
     test_scores = []
     test_scores.append(test(agent, args, None, test_env))
+    '''
     for episode in train_env.get_episodes():
         #episode = episode[0]
-        batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
+        #batch_loss, avg_reward, success_rate = train_one_episode(agent, episode)
         if agent.update_steps % 2 == 0:
             test_scores.append(test(agent, args, None, test_env))
         if agent.update_steps == start_step+training_step:
             break
+    '''
     agent.update_steps=start_step
     return np.array(test_scores)
 
